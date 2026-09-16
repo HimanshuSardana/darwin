@@ -1,22 +1,50 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onMount } from "svelte";
+
+const appWindow = getCurrentWindow();
 
 let sessions = $state([]);
 let activeId = $state(null);
-let rawEvents = $state({}); // sessionId -> array of raw pi events
-let messages = $state({}); // sessionId -> derived chat bubbles
+let rawEvents = $state({}); // sessionId -> raw pi events
+let messages = $state({}); // sessionId -> thread items
 let draft = $state({}); // sessionId -> in-progress assistant text
+let titles = $state({}); // sessionId -> title
+let turnStartAt = $state({}); // sessionId -> ms timestamp
 let input = $state("");
-let cwdInput = $state("");
 let error = $state("");
 let streaming = $state({}); // sessionId -> bool
-let models = $state({}); // sessionId -> [{id, name, provider, ...}]
+
+// model + thinking state
+let models = $state({}); // sessionId -> [{id, name, provider, reasoning}]
 let currentModel = $state({}); // sessionId -> {id, name, provider} | null
-let pickerOpen = $state(false);
+let thinkingLevels = $state({}); // sessionId -> string[]
+let thinkingLevel = $state({}); // sessionId -> string | null
+let pendingThinking = $state({}); // sessionId -> level sent, awaiting confirm
+let modelPickerOpen = $state(false);
+let thinkingPickerOpen = $state(false);
 let modelSearch = $state("");
-let modelsLoading = $state({}); // sessionId -> bool
+let modelsLoading = $state({});
+
+// sidebar state
+let sidebarHidden = $state(false);
+let searchOpen = $state(false);
+let searchQuery = $state("");
+let newOpen = $state(false);
+let newCwd = $state("");
+let backStack = $state([]);
+let fwdStack = $state([]);
+
+// header / settings state
+let menuOpen = $state(false);
+let renaming = $state(false);
+let renameValue = $state("");
+let settingsOpen = $state(false);
+let appInfo = $state(null);
+
+let composerEl = $state(null);
 
 function ensureSession(id) {
   if (!rawEvents[id]) rawEvents[id] = [];
@@ -24,12 +52,61 @@ function ensureSession(id) {
   if (!draft[id]) draft[id] = "";
   if (!models[id]) models[id] = [];
   if (!(id in currentModel)) currentModel[id] = null;
+  if (!thinkingLevels[id]) thinkingLevels[id] = [];
+  if (!(id in thinkingLevel)) thinkingLevel[id] = null;
+}
+
+function fmtElapsed(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `Worked for ${s}s`;
+  const m = Math.floor(s / 60);
+  return `Worked for ${m}m ${s % 60}s`;
+}
+
+function relTime(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (Number.isNaN(ms) || ms < 0) return "";
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+function projectOf(s) {
+  const parts = (s.cwd ?? "").split("/").filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "local";
+}
+
+function sessionTitle(id) {
+  if (titles[id]) return titles[id];
+  const first = (messages[id] ?? []).find((m) => m.role === "user");
+  if (first) return first.text.slice(0, 42);
+  return "New thread";
+}
+
+function groupedSessions() {
+  const q = searchQuery.trim().toLowerCase();
+  const groups = new Map();
+  for (const s of sessions) {
+    const title = sessionTitle(s.id);
+    if (
+      q &&
+      !`${title} ${s.cwd ?? ""}`.toLowerCase().includes(q)
+    )
+      continue;
+    const p = projectOf(s);
+    if (!groups.has(p)) groups.set(p, []);
+    groups.get(p).push(s);
+  }
+  return [...groups.entries()];
 }
 
 function modelLabel(id) {
   const m = currentModel[id];
-  if (!m) return "select model";
-  return `${m.provider}/${m.name ?? m.id}`;
+  if (!m) return "Model";
+  return m.name ?? m.id;
 }
 
 function filteredModels(id) {
@@ -51,76 +128,62 @@ function groupedModels(id) {
   return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
 }
 
-async function refreshModels(id) {
-  modelsLoading[id] = true;
-  try {
-    await invoke("request_state", { sessionId: id });
-    await invoke("request_models", { sessionId: id });
-  } catch (e) {
-    error = String(e);
-  }
-}
-
-async function pickModel(provider, modelId) {
-  if (!activeId) return;
-  error = "";
-  try {
-    await invoke("set_model", { sessionId: activeId, provider, modelId });
-    pickerOpen = false;
-    modelSearch = "";
-  } catch (e) {
-    error = String(e);
-  }
-}
-
-async function cycleModelClick() {
-  if (!activeId) return;
-  try {
-    await invoke("cycle_model", { sessionId: activeId });
-  } catch (e) {
-    error = String(e);
-  }
-}
-
 function applyEvent(sessionId, ev) {
   ensureSession(sessionId);
   rawEvents[sessionId].push(ev);
   const t = ev?.type;
 
-  if (t === "agent_start" || t === "turn_start" || t === "message_start") {
+  if (t === "agent_start" || t === "turn_start") {
     streaming[sessionId] = true;
+    if (turnStartAt[sessionId] == null) turnStartAt[sessionId] = Date.now();
   }
-  if (t === "agent_end" || t === "agent_settled" || t === "turn_end") {
+  if (t === "message_start") streaming[sessionId] = true;
+  if (t === "turn_end" || t === "agent_end" || t === "agent_settled") {
     streaming[sessionId] = false;
+    if (draft[sessionId]) {
+      messages[sessionId].push({ role: "assistant", text: draft[sessionId] });
+      draft[sessionId] = "";
+    }
+    if (turnStartAt[sessionId] != null) {
+      messages[sessionId].push({
+        role: "work",
+        text: fmtElapsed(Date.now() - turnStartAt[sessionId]),
+      });
+      turnStartAt[sessionId] = null;
+    }
   }
   if (t === "message_end") {
     if (draft[sessionId]) {
       messages[sessionId].push({ role: "assistant", text: draft[sessionId] });
       draft[sessionId] = "";
     }
-    streaming[sessionId] = false;
   }
   if (t === "message_update") {
     const inner = ev.assistantMessageEvent ?? ev.messageEvent ?? {};
     const kind = inner.type ?? "";
     if (kind === "text_delta" && typeof inner.delta === "string") {
       draft[sessionId] += inner.delta;
-    } else if (kind === "text" && typeof inner.text === "string") {
-      draft[sessionId] += inner.text;
-    } else if (inner.text && typeof inner.text === "string") {
+    } else if (typeof inner.text === "string") {
       draft[sessionId] += inner.text;
     }
   }
   if (t === "tool_execution_start") {
-    const name = ev.toolName ?? ev.tool ?? "tool";
-    messages[sessionId].push({ role: "tool", text: `▶ ${name}` });
+    messages[sessionId].push({
+      role: "tool",
+      text: `▶ ${ev.toolName ?? ev.tool ?? "tool"}`,
+    });
   }
   if (t === "tool_execution_end") {
-    const name = ev.toolName ?? ev.tool ?? "tool";
-    messages[sessionId].push({ role: "tool", text: `✔ ${name} done` });
+    messages[sessionId].push({
+      role: "tool",
+      text: `✔ ${ev.toolName ?? ev.tool ?? "tool"} done`,
+    });
   }
   if (t === "bash_execution_update" && ev.output) {
-    messages[sessionId].push({ role: "tool", text: "$ " + String(ev.output).slice(0, 500) });
+    messages[sessionId].push({
+      role: "tool",
+      text: "$ " + String(ev.output).slice(0, 300),
+    });
   }
   if (t === "response" && ev.command === "get_available_models" && ev.success) {
     models[sessionId] = ev.data?.models ?? [];
@@ -128,6 +191,8 @@ function applyEvent(sessionId, ev) {
   }
   if (t === "response" && ev.command === "get_state" && ev.success) {
     currentModel[sessionId] = ev.data?.model ?? null;
+    if (ev.data?.thinkingLevel != null)
+      thinkingLevel[sessionId] = ev.data.thinkingLevel;
   }
   if (t === "response" && ev.command === "set_model" && ev.success) {
     currentModel[sessionId] = ev.data ?? null;
@@ -135,11 +200,31 @@ function applyEvent(sessionId, ev) {
   if (t === "response" && ev.command === "cycle_model" && ev.success) {
     if (ev.data?.model) currentModel[sessionId] = ev.data.model;
   }
+  if (
+    t === "response" &&
+    ev.command === "get_available_thinking_levels" &&
+    ev.success
+  ) {
+    thinkingLevels[sessionId] = ev.data?.levels ?? [];
+  }
+  if (t === "response" && ev.command === "set_thinking_level") {
+    if (ev.success && pendingThinking[sessionId] != null) {
+      thinkingLevel[sessionId] = pendingThinking[sessionId];
+      pendingThinking[sessionId] = null;
+    }
+  }
   if (t === "response" && ev.success === false) {
-    messages[sessionId].push({ role: "system", text: "RPC error: " + JSON.stringify(ev) });
+    messages[sessionId].push({
+      role: "system",
+      text: "RPC error: " + JSON.stringify(ev),
+    });
   }
   if (t === "error" || t === "agent_error") {
-    messages[sessionId].push({ role: "system", text: "Error: " + (ev.message ?? JSON.stringify(ev)) });
+    messages[sessionId].push({
+      role: "system",
+      text: "Error: " + (ev.message ?? JSON.stringify(ev)),
+    });
+    streaming[sessionId] = false;
   }
 }
 
@@ -153,40 +238,93 @@ async function refreshSessions() {
   }
 }
 
-async function createSession() {
-  error = "";
+async function refreshMeta(id) {
+  modelsLoading[id] = true;
   try {
-    const id = await invoke("create_session", { cwd: cwdInput.trim() || null });
-    await refreshSessions();
-    activeId = id;
-    ensureSession(id);
-    refreshModels(id);
+    await invoke("request_state", { sessionId: id });
+    await invoke("request_models", { sessionId: id });
+    await invoke("request_thinking_levels", { sessionId: id });
   } catch (e) {
     error = String(e);
   }
 }
 
-async function selectSession(id) {
+async function createSession(cwd) {
+  error = "";
+  try {
+    const id = await invoke("create_session", { cwd: cwd?.trim() || null });
+    await refreshSessions();
+    backStack.push(activeId);
+    fwdStack = [];
+    activeId = id;
+    ensureSession(id);
+    newOpen = false;
+    newCwd = "";
+    refreshMeta(id);
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function selectSession(id, push = true) {
+  if (push && activeId && activeId !== id) {
+    backStack.push(activeId);
+    fwdStack = [];
+  }
   activeId = id;
   ensureSession(id);
-  // backfill anything missed while away
+  modelPickerOpen = false;
+  thinkingPickerOpen = false;
+  menuOpen = false;
+  renaming = false;
   try {
     const after = rawEvents[id].length;
     const evs = await invoke("get_events", { sessionId: id, after });
     for (const ev of evs) applyEvent(id, ev);
-    // re-query model state in case the child restarted or state changed
-    if (currentModel[id] === null && (models[id] ?? []).length === 0) refreshModels(id);
+    if (currentModel[id] === null && (models[id] ?? []).length === 0)
+      refreshMeta(id);
   } catch (e) {
     error = String(e);
   }
+}
+
+function goBack() {
+  while (backStack.length) {
+    const id = backStack.pop();
+    if (id && sessions.some((s) => s.id === id)) {
+      fwdStack.push(activeId);
+      selectSession(id, false);
+      return;
+    }
+  }
+}
+
+function goFwd() {
+  while (fwdStack.length) {
+    const id = fwdStack.pop();
+    if (id && sessions.some((s) => s.id === id)) {
+      backStack.push(activeId);
+      selectSession(id, false);
+      return;
+    }
+  }
+}
+
+function autoresize() {
+  if (!composerEl) return;
+  composerEl.style.height = "auto";
+  composerEl.style.height = Math.min(composerEl.scrollHeight, 200) + "px";
 }
 
 async function send() {
   const text = input.trim();
   if (!text || !activeId) return;
   error = "";
+  const isFirst = !(messages[activeId] ?? []).some((m) => m.role === "user");
   messages[activeId].push({ role: "user", text });
+  if (isFirst && !titles[activeId]) titles[activeId] = text.slice(0, 42);
   input = "";
+  if (composerEl) composerEl.style.height = "auto";
   try {
     if (streaming[activeId]) {
       await invoke("send_steer", { sessionId: activeId, message: text });
@@ -216,7 +354,10 @@ async function destroy() {
     delete messages[id];
     delete models[id];
     delete currentModel[id];
-    pickerOpen = false;
+    delete titles[id];
+    menuOpen = false;
+    backStack = backStack.filter((x) => x !== id);
+    fwdStack = fwdStack.filter((x) => x !== id);
     activeId = null;
     await refreshSessions();
   } catch (e) {
@@ -224,8 +365,50 @@ async function destroy() {
   }
 }
 
+async function pickModel(provider, modelId) {
+  if (!activeId) return;
+  try {
+    await invoke("set_model", { sessionId: activeId, provider, modelId });
+    modelPickerOpen = false;
+    modelSearch = "";
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function pickThinking(level) {
+  if (!activeId) return;
+  pendingThinking[activeId] = level;
+  thinkingPickerOpen = false;
+  try {
+    await invoke("set_thinking_level", { sessionId: activeId, level });
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function openSettings() {
+  try {
+    appInfo = await invoke("app_info");
+  } catch (e) {
+    error = String(e);
+  }
+  settingsOpen = true;
+}
+
+async function winMin() {
+  await appWindow.minimize();
+}
+async function winMax() {
+  await appWindow.toggleMaximize();
+}
+async function winClose() {
+  await appWindow.close();
+}
+
 onMount(async () => {
   await refreshSessions();
+  if (activeId) refreshMeta(activeId);
   await listen("pi-event", (e) => {
     const { session_id, event } = e.payload;
     applyEvent(session_id, event);
@@ -233,113 +416,244 @@ onMount(async () => {
 });
 </script>
 
-<div class="flex h-full bg-zinc-950 text-zinc-100 dark">
-  <aside class="flex w-72 flex-col gap-3 border-r border-zinc-800 bg-zinc-900 p-3">
-    <h1 class="text-xl font-bold tracking-widest">darwin</h1>
-    <div class="flex gap-2">
-      <input
-        placeholder="cwd (optional)"
-        bind:value={cwdInput}
-        class="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
-      />
-      <button
-        onclick={createSession}
-        class="rounded-md border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-sm hover:bg-zinc-700"
-      >+ session</button>
-    </div>
-    <div class="flex flex-col gap-1.5 overflow-y-auto">
-      {#each sessions as s}
-        <button
-          onclick={() => selectSession(s.id)}
-          class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left hover:bg-zinc-800 {s.id === activeId ? 'border-blue-500' : 'border-zinc-700 bg-zinc-900'}"
-        >
-          <span class="h-2 w-2 shrink-0 rounded-full {s.alive ? 'bg-green-400' : 'bg-zinc-600'}"></span>
-          <span class="font-mono text-xs">{s.id}</span>
-          <span class="truncate text-[11px] opacity-60">{s.cwd}</span>
+<div class="flex h-full bg-black text-zinc-100">
+  <!-- sidebar -->
+  {#if !sidebarHidden}
+    <aside class="flex w-[300px] shrink-0 flex-col border-r border-zinc-800/70 bg-[#0c0c0e]">
+      <div data-tauri-drag-region class="flex items-center gap-1.5 px-3 pt-3 pb-1">
+        <button onclick={winClose} title="Close" class="rounded p-1.5 hover:bg-zinc-800">
+          <span class="block h-2.5 w-2.5 rounded-full bg-zinc-700"></span>
         </button>
-      {/each}
-      {#if sessions.length === 0}
-        <p class="text-[13px] opacity-60">No sessions yet. Create one to spawn <code class="font-mono">pi --mode rpc</code>.</p>
-      {/if}
-    </div>
-    {#if error}<pre class="whitespace-pre-wrap text-xs text-red-400">{error}</pre>{/if}
-  </aside>
+        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-sm leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">–</button>
+        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-xs leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">□</button>
+        <span class="w-1"></span>
+        <button onclick={() => (sidebarHidden = true)} title="Hide sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">◫</button>
+        <button onclick={goBack} title="Back" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">←</button>
+        <button onclick={goFwd} title="Forward" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">→</button>
+      </div>
 
-  <main class="flex flex-1 flex-col">
-    {#if !activeId}
-      <p class="p-4 text-sm opacity-60">Create or pick a session to chat with pi.</p>
-    {:else}
-      <div class="relative flex items-center gap-2 border-b border-zinc-800 px-4 py-2">
+      <div class="flex flex-col gap-0.5 px-3 pt-2">
         <button
-          onclick={() => { pickerOpen = !pickerOpen; if (pickerOpen) refreshModels(activeId); }}
-          class="flex max-w-md items-center gap-2 truncate rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs hover:bg-zinc-800"
-          title="Pick model"
+          onclick={() => { newOpen = !newOpen; }}
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70"
         >
-          <span class="truncate font-mono">{modelLabel(activeId)}</span>
-          <span class="opacity-60">▾</span>
+          <span class="text-zinc-400">🗀</span> New thread
         </button>
-        <button
-          onclick={cycleModelClick}
-          title="Cycle to next model"
-          class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs hover:bg-zinc-800"
-        >⇄</button>
-        {#if modelsLoading[activeId]}<span class="text-xs opacity-50">loading…</span>{/if}
-        {#if pickerOpen}
-          <div class="absolute top-full left-2 z-20 mt-1 flex max-h-96 w-96 flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl">
+        {#if newOpen}
+          <div class="flex flex-col gap-2 rounded-lg bg-zinc-900 p-2.5">
             <input
-              placeholder="Search models…"
-              bind:value={modelSearch}
-              class="border-b border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              placeholder="Working dir (optional)"
+              bind:value={newCwd}
+              onkeydown={(e) => e.key === "Enter" && createSession(newCwd)}
+              class="rounded-md border border-zinc-700 bg-black px-2 py-1.5 text-sm outline-none focus:border-blue-500"
             />
-            <div class="overflow-y-auto p-1">
-              {#each groupedModels(activeId) as [provider, list]}
-                <p class="px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-zinc-400 uppercase">{provider}</p>
-                {#each list as m}
-                  <button
-                    onclick={() => pickModel(m.provider, m.id)}
-                    class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800 {currentModel[activeId]?.id === m.id && currentModel[activeId]?.provider === m.provider ? 'bg-zinc-800 ring-1 ring-blue-500' : ''}"
-                  >
-                    <span class="truncate">{m.name ?? m.id}</span>
-                    {#if m.reasoning}<span class="shrink-0 rounded bg-purple-900 px-1.5 py-0.5 text-[10px] text-purple-200">reasoning</span>{/if}
-                  </button>
-                {/each}
-              {/each}
-              {#if filteredModels(activeId).length === 0}
-                <p class="p-3 text-sm opacity-60">{(models[activeId] ?? []).length === 0 ? "No models loaded yet — waiting on pi…" : "No matches."}</p>
-              {/if}
+            <div class="flex gap-2">
+              <button onclick={() => createSession(newCwd)} class="flex-1 rounded-md bg-zinc-100 px-2 py-1.5 text-sm font-medium text-black hover:bg-white">Create</button>
+              <button onclick={() => (newOpen = false)} class="rounded-md border border-zinc-700 px-2 py-1.5 text-sm hover:bg-zinc-800">Cancel</button>
             </div>
           </div>
         {/if}
+        <button
+          onclick={() => { searchOpen = !searchOpen; searchQuery = ""; }}
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70"
+        >
+          <span class="text-zinc-400">⌕</span> Search
+        </button>
+        {#if searchOpen}
+          <input
+            placeholder="Filter threads…"
+            bind:value={searchQuery}
+            class="mx-0.5 rounded-md border border-zinc-700 bg-black px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+          />
+        {/if}
       </div>
-      <div class="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
-        {#each messages[activeId] ?? [] as m}
-          {#if m.role === 'user'}
-            <div class="max-w-[75ch] self-end rounded-xl bg-blue-900 px-3 py-2 text-sm whitespace-pre-wrap">{m.text}</div>
-          {:else if m.role === 'tool'}
-            <div class="self-start font-mono text-xs opacity-75">{m.text}</div>
-          {:else if m.role === 'system'}
-            <div class="self-center text-xs text-red-300">{m.text}</div>
-          {:else}
-            <div class="max-w-[75ch] self-start rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm whitespace-pre-wrap">{m.text}</div>
-          {/if}
+
+      <div class="mt-3 flex-1 overflow-y-auto px-3 pb-2">
+        {#if groupedSessions().length}
+          <p class="px-2.5 pt-3 pb-1 text-[15px] text-zinc-400">Projects</p>
+        {/if}
+        {#each groupedSessions() as [project, list]}
+          <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[15px]">
+            <span class="flex items-center gap-2.5"><span class="text-zinc-400">🗀</span> {project}</span>
+            <span class="text-zinc-600">✎</span>
+          </div>
+          {#each list as s}
+            <button
+              onclick={() => selectSession(s.id)}
+              class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70 {s.id === activeId ? 'bg-zinc-800/80' : ''}"
+            >
+              <span class="flex items-center gap-2 truncate"><span class={s.alive ? "h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" : "h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600"}></span><span class="truncate">{sessionTitle(s.id)}</span></span>
+              <span class="shrink-0 text-[13px] text-zinc-500">{relTime(s.created_at)}</span>
+            </button>
+          {/each}
         {/each}
-        {#if draft[activeId]}
-          <div class="max-w-[75ch] self-start rounded-xl border border-blue-500 bg-zinc-900 px-3 py-2 text-sm whitespace-pre-wrap">{draft[activeId]}▍</div>
+        {#if sessions.length === 0}
+          <p class="px-2.5 pt-4 text-sm text-zinc-500">No threads yet. Start one above.</p>
         {/if}
       </div>
-      <div class="flex gap-2 border-t border-zinc-800 p-3">
-        <input
-          placeholder={streaming[activeId] ? "Agent running — Enter steers it…" : "Message pi…"}
-          bind:value={input}
-          onkeydown={(e) => e.key === "Enter" && send()}
-          class="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-        />
-        <button onclick={send} class="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm hover:bg-zinc-700">Send</button>
-        {#if streaming[activeId]}
-          <button onclick={abort} class="rounded-md border border-red-900 bg-zinc-800 px-3 py-2 text-sm hover:bg-zinc-700">Abort</button>
+
+      {#if error}<pre class="max-h-24 overflow-y-auto px-5 pb-1 text-xs whitespace-pre-wrap text-red-400">{error}</pre>{/if}
+
+      <div class="p-3">
+        <button onclick={openSettings} class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70">
+          <span class="text-zinc-400">⚙</span> Settings
+        </button>
+      </div>
+    </aside>
+  {/if}
+
+  <!-- main -->
+  <main class="flex min-w-0 flex-1 flex-col">
+    {#if sidebarHidden}
+      <div data-tauri-drag-region class="flex items-center gap-1 px-3 pt-3">
+        <button onclick={() => (sidebarHidden = false)} title="Show sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">◫</button>
+        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-sm leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">–</button>
+        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-xs leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">□</button>
+        <button onclick={winClose} title="Close" class="rounded p-1.5 text-xs leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">×</button>
+      </div>
+    {/if}
+
+    {#if !activeId}
+      <div class="flex flex-1 items-center justify-center">
+        <p class="text-[15px] text-zinc-500">Create a thread to chat with pi.</p>
+      </div>
+    {:else}
+      <div data-tauri-drag-region class="flex items-center justify-between border-b border-zinc-800/70 px-5 py-3">
+        {#if renaming}
+          <input
+            bind:value={renameValue}
+            onkeydown={(e) => {
+              if (e.key === "Enter") { titles[activeId] = renameValue.trim() || sessionTitle(activeId); renaming = false; }
+              if (e.key === "Escape") renaming = false;
+            }}
+            class="w-72 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[15px] outline-none focus:border-blue-500"
+          />
+        {:else}
+          <h2 class="truncate text-[17px] font-medium">{sessionTitle(activeId)}</h2>
         {/if}
-        <button onclick={destroy} title="Kill pi child" class="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm opacity-60 hover:bg-zinc-700">✕</button>
+        <div class="relative">
+          <button onclick={() => (menuOpen = !menuOpen)} class="rounded-md px-2 py-1 text-lg leading-none text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">⋯</button>
+          {#if menuOpen}
+            <div class="absolute top-full right-0 z-30 mt-1 w-44 overflow-hidden rounded-lg border border-zinc-700 bg-[#141416] shadow-xl">
+              <button onclick={() => { renameValue = sessionTitle(activeId); renaming = true; menuOpen = false; }} class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-800">Rename</button>
+              <button onclick={() => { menuOpen = false; abort(); }} class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-800">Abort run</button>
+              <button onclick={destroy} class="block w-full px-3 py-2 text-left text-sm text-red-300 hover:bg-zinc-800">Kill thread</button>
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <div class="flex flex-1 justify-center overflow-y-auto">
+        <div class="flex w-full max-w-3xl flex-col gap-5 px-6 py-6">
+          {#each messages[activeId] ?? [] as m}
+            {#if m.role === "user"}
+              <div class="max-w-[80%] self-end rounded-2xl bg-[#1e1e21] px-4 py-2.5 text-[15px] leading-7 whitespace-pre-wrap">{m.text}</div>
+            {:else if m.role === "assistant"}
+              <div class="text-[15px] leading-7 whitespace-pre-wrap">{m.text}</div>
+            {:else if m.role === "tool"}
+              <div class="font-mono text-xs text-zinc-500">{m.text}</div>
+            {:else if m.role === "work"}
+              <details class="text-sm text-zinc-400">
+                <summary class="cursor-pointer list-none hover:text-zinc-200">{m.text} <span class="text-zinc-600">›</span></summary>
+              </details>
+            {:else}
+              <div class="self-center text-xs text-red-300">{m.text}</div>
+            {/if}
+          {/each}
+          {#if draft[activeId]}
+            <div class="text-[15px] leading-7 whitespace-pre-wrap">{draft[activeId]}▍</div>
+          {/if}
+          {#if (messages[activeId] ?? []).length === 0 && !draft[activeId]}
+            <p class="pt-10 text-center text-[15px] text-zinc-600">Ask pi to read, write, or run anything in this folder.</p>
+          {/if}
+        </div>
+      </div>
+
+      <div class="flex justify-center px-6 pb-5">
+        <div class="w-full max-w-3xl rounded-2xl border border-zinc-700/60 bg-[#151517] px-4 pt-3 pb-2.5">
+          <textarea
+            bind:this={composerEl}
+            rows={1}
+            placeholder="Ask for follow-up changes"
+            bind:value={input}
+            oninput={autoresize}
+            onkeydown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+            }}
+            class="max-h-[200px] w-full resize-none bg-transparent text-[15px] leading-6 outline-none placeholder:text-zinc-600"
+          ></textarea>
+          <div class="flex items-center justify-between pt-1.5">
+            <button
+              onclick={() => { const s = sessions.find((x) => x.id === activeId); createSession(s?.cwd); }}
+              title="New thread in same folder"
+              class="rounded-full p-1.5 text-xl leading-none text-zinc-300 hover:bg-zinc-700/60"
+            >+</button>
+            <div class="flex items-center gap-1.5">
+              {#if streaming[activeId]}<span class="mr-1 h-4 w-4 animate-spin rounded-full border border-zinc-600 border-t-zinc-200"></span>{/if}
+              <div class="relative">
+                <button onclick={() => { modelPickerOpen = !modelPickerOpen; thinkingPickerOpen = false; if (modelPickerOpen) refreshMeta(activeId); }} class="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700/60">
+                  {modelLabel(activeId)} <span class="text-xs text-zinc-500">▾</span>
+                </button>
+                {#if modelPickerOpen}
+                  <div class="absolute right-0 bottom-full z-30 mb-2 flex max-h-80 w-80 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#141416] shadow-xl">
+                    <input placeholder="Search models…" bind:value={modelSearch} class="border-b border-zinc-700 bg-black px-3 py-2 text-sm outline-none" />
+                    <div class="overflow-y-auto p-1">
+                      {#each groupedModels(activeId) as [provider, list]}
+                        <p class="px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">{provider}</p>
+                        {#each list as m}
+                          <button onclick={() => pickModel(m.provider, m.id)} class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800 {currentModel[activeId]?.id === m.id && currentModel[activeId]?.provider === m.provider ? 'bg-zinc-800 ring-1 ring-blue-500' : ''}">
+                            <span class="truncate">{m.name ?? m.id}</span>
+                            {#if m.reasoning}<span class="shrink-0 rounded bg-purple-900 px-1.5 py-0.5 text-[10px] text-purple-200">reasoning</span>{/if}
+                          </button>
+                        {/each}
+                      {/each}
+                      {#if filteredModels(activeId).length === 0}
+                        <p class="p-3 text-sm text-zinc-500">{(models[activeId] ?? []).length === 0 ? "Waiting on pi…" : "No matches."}</p>
+                      {/if}
+                    </div>
+                  </div>
+                {/if}
+              </div>
+              <div class="relative">
+                <button onclick={() => { thinkingPickerOpen = !thinkingPickerOpen; modelPickerOpen = false; }} class="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700/60">
+                  {(thinkingLevel[activeId] ?? "").charAt(0).toUpperCase() + (thinkingLevel[activeId] ?? "").slice(1) || "Level"} <span class="text-xs text-zinc-500">▾</span>
+                </button>
+                {#if thinkingPickerOpen}
+                  <div class="absolute right-0 bottom-full z-30 mb-2 w-36 overflow-hidden rounded-xl border border-zinc-700 bg-[#141416] p-1 shadow-xl">
+                    {#each thinkingLevels[activeId].length ? thinkingLevels[activeId] : ["off", "minimal", "low", "medium", "high"] as lv}
+                      <button onclick={() => pickThinking(lv)} class="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize hover:bg-zinc-800 {thinkingLevel[activeId] === lv ? 'bg-zinc-800 ring-1 ring-blue-500' : ''}">{lv}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+              {#if streaming[activeId]}
+                <button onclick={abort} title="Stop" class="rounded-full bg-zinc-100 p-2.5 text-black hover:bg-white"><span class="block h-3 w-3 bg-black"></span></button>
+              {:else}
+                <button onclick={send} disabled={!input.trim()} title="Send" class="rounded-full bg-zinc-700/60 p-2.5 text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"><span class="block text-base leading-none">↑</span></button>
+              {/if}
+            </div>
+          </div>
+        </div>
       </div>
     {/if}
   </main>
 </div>
+
+{#if settingsOpen}
+  <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60">
+    <div class="w-96 rounded-2xl border border-zinc-700 bg-[#141416] p-5">
+      <h3 class="mb-3 text-lg font-medium">Settings</h3>
+      {#if appInfo}
+        <dl class="flex flex-col gap-2 text-sm">
+          <div class="flex justify-between gap-3"><dt class="text-zinc-500">pi binary</dt><dd class="truncate font-mono text-xs">{appInfo.pi_bin}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-zinc-500">pi version</dt><dd class="font-mono text-xs">{appInfo.pi_version}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-zinc-500">sessions dir</dt><dd class="truncate font-mono text-xs">{appInfo.session_root}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-zinc-500">live sessions</dt><dd class="font-mono text-xs">{appInfo.sessions}</dd></div>
+        </dl>
+      {:else}
+        <p class="text-sm text-zinc-500">Loading…</p>
+      {/if}
+      <button onclick={() => (settingsOpen = false)} class="mt-4 w-full rounded-lg bg-zinc-100 py-2 text-sm font-medium text-black hover:bg-white">Close</button>
+    </div>
+  </div>
+{/if}
