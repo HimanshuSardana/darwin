@@ -30,9 +30,9 @@ Working rules:
 - [x] Commit: `feat(ui): markdown message component with code blocks`
 
 ## Step 4 — Icon pass (replace every emoji)
-- [ ] Audit `src/App.svelte` for emoji/glyph icons
-- [ ] Replace with `lucide-svelte` icons
-- [ ] Commit: `refactor(ui): replace emoji glyphs with lucide icons`
+- [x] Audit `src/App.svelte` for emoji/glyph icons
+- [x] Replace with `lucide-svelte` icons
+- [x] Commit: `refactor(ui): replace emoji glyphs with lucide icons`
 
 ## Step 5 — Visual redesign (modern, clean)
 - [ ] Design tokens: surfaces, border, text hierarchy, accent, radius, shadow

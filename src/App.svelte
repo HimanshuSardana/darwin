@@ -4,6 +4,26 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onMount } from "svelte";
 import Markdown from "./lib/Markdown.svelte";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  Loader2,
+  Minus,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  Settings,
+  Square,
+  X,
+} from "lucide-svelte";
 
 const appWindow = getCurrentWindow();
 
@@ -171,19 +191,22 @@ function applyEvent(sessionId, ev) {
   if (t === "tool_execution_start") {
     messages[sessionId].push({
       role: "tool",
-      text: `▶ ${ev.toolName ?? ev.tool ?? "tool"}`,
+      tool: ev.toolName ?? ev.tool ?? "tool",
+      phase: "start",
     });
   }
   if (t === "tool_execution_end") {
     messages[sessionId].push({
       role: "tool",
-      text: `✔ ${ev.toolName ?? ev.tool ?? "tool"} done`,
+      tool: ev.toolName ?? ev.tool ?? "tool",
+      phase: "end",
+      isError: ev.isError ?? false,
     });
   }
   if (t === "bash_execution_update" && ev.output) {
     messages[sessionId].push({
-      role: "tool",
-      text: "$ " + String(ev.output).slice(0, 300),
+      role: "bash",
+      text: String(ev.output),
     });
   }
   if (t === "response" && ev.command === "get_available_models" && ev.success) {
@@ -425,12 +448,12 @@ onMount(async () => {
         <button onclick={winClose} title="Close" class="rounded p-1.5 hover:bg-zinc-800">
           <span class="block h-2.5 w-2.5 rounded-full bg-zinc-700"></span>
         </button>
-        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-sm leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">–</button>
-        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-xs leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">□</button>
+        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Minus size={14} /></button>
+        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Square size={12} /></button>
         <span class="w-1"></span>
-        <button onclick={() => (sidebarHidden = true)} title="Hide sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">◫</button>
-        <button onclick={goBack} title="Back" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">←</button>
-        <button onclick={goFwd} title="Forward" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">→</button>
+        <button onclick={() => (sidebarHidden = true)} title="Hide sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><PanelLeftClose size={16} /></button>
+        <button onclick={goBack} title="Back" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><ArrowLeft size={16} /></button>
+        <button onclick={goFwd} title="Forward" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><ArrowRight size={16} /></button>
       </div>
 
       <div class="flex flex-col gap-0.5 px-3 pt-2">
@@ -438,7 +461,7 @@ onMount(async () => {
           onclick={() => { newOpen = !newOpen; }}
           class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70"
         >
-          <span class="text-zinc-400">🗀</span> New thread
+          <span class="flex items-center gap-2.5"><Folder size={16} class="text-zinc-400" /> New thread</span>
         </button>
         {#if newOpen}
           <div class="flex flex-col gap-2 rounded-lg bg-zinc-900 p-2.5">
@@ -458,7 +481,7 @@ onMount(async () => {
           onclick={() => { searchOpen = !searchOpen; searchQuery = ""; }}
           class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70"
         >
-          <span class="text-zinc-400">⌕</span> Search
+          <span class="flex items-center gap-2.5"><Search size={16} class="text-zinc-400" /> Search</span>
         </button>
         {#if searchOpen}
           <input
@@ -475,8 +498,8 @@ onMount(async () => {
         {/if}
         {#each groupedSessions() as [project, list]}
           <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[15px]">
-            <span class="flex items-center gap-2.5"><span class="text-zinc-400">🗀</span> {project}</span>
-            <span class="text-zinc-600">✎</span>
+            <span class="flex items-center gap-2.5"><Folder size={16} class="text-zinc-400" /> {project}</span>
+            <span class="text-zinc-600"><Pencil size={13} /></span>
           </div>
           {#each list as s}
             <button
@@ -497,7 +520,7 @@ onMount(async () => {
 
       <div class="p-3">
         <button onclick={openSettings} class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70">
-          <span class="text-zinc-400">⚙</span> Settings
+          <span class="flex items-center gap-2.5"><Settings size={16} class="text-zinc-400" /> Settings</span>
         </button>
       </div>
     </aside>
@@ -507,10 +530,10 @@ onMount(async () => {
   <main class="flex min-w-0 flex-1 flex-col">
     {#if sidebarHidden}
       <div data-tauri-drag-region class="flex items-center gap-1 px-3 pt-3">
-        <button onclick={() => (sidebarHidden = false)} title="Show sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">◫</button>
-        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-sm leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">–</button>
-        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-xs leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">□</button>
-        <button onclick={winClose} title="Close" class="rounded p-1.5 text-xs leading-none text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200">×</button>
+        <button onclick={() => (sidebarHidden = false)} title="Show sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><PanelLeftOpen size={16} /></button>
+        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Minus size={14} /></button>
+        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Square size={12} /></button>
+        <button onclick={winClose} title="Close" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><X size={16} /></button>
       </div>
     {/if}
 
@@ -533,7 +556,7 @@ onMount(async () => {
           <h2 class="truncate text-[17px] font-medium">{sessionTitle(activeId)}</h2>
         {/if}
         <div class="relative">
-          <button onclick={() => (menuOpen = !menuOpen)} class="rounded-md px-2 py-1 text-lg leading-none text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">⋯</button>
+          <button onclick={() => (menuOpen = !menuOpen)} class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><MoreHorizontal size={18} /></button>
           {#if menuOpen}
             <div class="absolute top-full right-0 z-30 mt-1 w-44 overflow-hidden rounded-lg border border-zinc-700 bg-[#141416] shadow-xl">
               <button onclick={() => { renameValue = sessionTitle(activeId); renaming = true; menuOpen = false; }} class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-800">Rename</button>
@@ -552,10 +575,21 @@ onMount(async () => {
             {:else if m.role === "assistant"}
               <Markdown source={m.text} />
             {:else if m.role === "tool"}
-              <div class="font-mono text-xs text-zinc-500">{m.text}</div>
+              <div class="flex items-center gap-2 font-mono text-xs text-zinc-500">
+                {#if m.phase === "start"}
+                  <Loader2 size={12} class="animate-spin text-zinc-500" />
+                {:else if m.isError}
+                  <X size={12} class="text-red-400" />
+                {:else}
+                  <Check size={12} class="text-emerald-400" />
+                {/if}
+                <span>{m.tool}</span>
+              </div>
+            {:else if m.role === "bash"}
+              <pre class="overflow-x-auto rounded-lg border border-zinc-800 bg-[#0d0d0f] p-2.5 font-mono text-[11.5px] whitespace-pre-wrap text-zinc-400">{m.text}</pre>
             {:else if m.role === "work"}
               <details class="text-sm text-zinc-400">
-                <summary class="cursor-pointer list-none hover:text-zinc-200">{m.text} <span class="text-zinc-600">›</span></summary>
+                <summary class="flex cursor-pointer list-none items-center gap-1 hover:text-zinc-200">{m.text} <ChevronRight size={14} class="text-zinc-600" /></summary>
               </details>
             {:else}
               <div class="self-center text-xs text-red-300">{m.text}</div>
@@ -588,12 +622,12 @@ onMount(async () => {
               onclick={() => { const s = sessions.find((x) => x.id === activeId); createSession(s?.cwd); }}
               title="New thread in same folder"
               class="rounded-full p-1.5 text-xl leading-none text-zinc-300 hover:bg-zinc-700/60"
-            >+</button>
+            ><Plus size={18} /></button>
             <div class="flex items-center gap-1.5">
-              {#if streaming[activeId]}<span class="mr-1 h-4 w-4 animate-spin rounded-full border border-zinc-600 border-t-zinc-200"></span>{/if}
+              {#if streaming[activeId]}<Loader2 size={15} class="mr-1 animate-spin text-zinc-400" />{/if}
               <div class="relative">
                 <button onclick={() => { modelPickerOpen = !modelPickerOpen; thinkingPickerOpen = false; if (modelPickerOpen) refreshMeta(activeId); }} class="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700/60">
-                  {modelLabel(activeId)} <span class="text-xs text-zinc-500">▾</span>
+                  {modelLabel(activeId)} <ChevronDown size={13} class="text-zinc-500" />
                 </button>
                 {#if modelPickerOpen}
                   <div class="absolute right-0 bottom-full z-30 mb-2 flex max-h-80 w-80 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#141416] shadow-xl">
@@ -617,7 +651,7 @@ onMount(async () => {
               </div>
               <div class="relative">
                 <button onclick={() => { thinkingPickerOpen = !thinkingPickerOpen; modelPickerOpen = false; }} class="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700/60">
-                  {(thinkingLevel[activeId] ?? "").charAt(0).toUpperCase() + (thinkingLevel[activeId] ?? "").slice(1) || "Level"} <span class="text-xs text-zinc-500">▾</span>
+                  {(thinkingLevel[activeId] ?? "").charAt(0).toUpperCase() + (thinkingLevel[activeId] ?? "").slice(1) || "Level"} <ChevronDown size={13} class="text-zinc-500" />
                 </button>
                 {#if thinkingPickerOpen}
                   <div class="absolute right-0 bottom-full z-30 mb-2 w-36 overflow-hidden rounded-xl border border-zinc-700 bg-[#141416] p-1 shadow-xl">
@@ -628,9 +662,9 @@ onMount(async () => {
                 {/if}
               </div>
               {#if streaming[activeId]}
-                <button onclick={abort} title="Stop" class="rounded-full bg-zinc-100 p-2.5 text-black hover:bg-white"><span class="block h-3 w-3 bg-black"></span></button>
+                <button onclick={abort} title="Stop" class="rounded-full bg-zinc-100 p-2.5 text-black hover:bg-white"><Square size={13} fill="currentColor" /></button>
               {:else}
-                <button onclick={send} disabled={!input.trim()} title="Send" class="rounded-full bg-zinc-700/60 p-2.5 text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"><span class="block text-base leading-none">↑</span></button>
+                <button onclick={send} disabled={!input.trim()} title="Send" class="rounded-full bg-zinc-700/60 p-2.5 text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"><Send size={15} /></button>
               {/if}
             </div>
           </div>
