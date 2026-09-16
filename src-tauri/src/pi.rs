@@ -6,7 +6,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 fn pi_binary() -> String {
@@ -45,7 +45,7 @@ struct SessionInner {
     alive: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct PiRegistry {
     inner: Arc<Mutex<HashMap<String, Arc<Mutex<SessionInner>>>>>,
 }
@@ -219,7 +219,4 @@ impl PiRegistry {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CreateSessionArgs {
-    pub cwd: Option<String>,
-}
+
