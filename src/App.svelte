@@ -334,6 +334,33 @@ function autoresize() {
   composerEl.style.height = Math.min(composerEl.scrollHeight, 220) + "px";
 }
 
+function onThreadScroll() {
+  if (!threadEl) return;
+  const dist = threadEl.scrollHeight - threadEl.scrollTop - threadEl.clientHeight;
+  pinnedToBottom = dist < 48;
+}
+
+function scrollToBottom(smooth = false) {
+  if (!threadEl) return;
+  threadEl.scrollTo({
+    top: threadEl.scrollHeight,
+    behavior: smooth && !reducedMotion ? "smooth" : "auto",
+  });
+  pinnedToBottom = true;
+}
+
+// Keep the transcript pinned to the newest content while the user is at the
+// bottom; stop following as soon as they scroll up and offer a jump button.
+$effect(() => {
+  const id = activeId;
+  if (!id) return;
+  const count = (messages[id] ?? []).length;
+  const draftLen = (draft[id] ?? "").length;
+  if (pinnedToBottom && (count > 0 || draftLen > 0)) {
+    queueMicrotask(() => scrollToBottom());
+  }
+});
+
 async function send() {
   const text = input.trim();
   if (!text || !activeId) return;
@@ -344,6 +371,7 @@ async function send() {
   input = "";
   if (composerEl) composerEl.style.height = "auto";
   pinnedToBottom = true;
+  queueMicrotask(() => scrollToBottom());
   try {
     if (streaming[activeId]) {
       await invoke("send_steer", { sessionId: activeId, message: text });
@@ -572,7 +600,7 @@ onMount(async () => {
   {/if}
 
   <!-- ─────────── main ─────────── -->
-  <main class="flex min-w-0 flex-1 flex-col bg-canvas">
+  <main class="relative flex min-w-0 flex-1 flex-col bg-canvas">
     {#if sidebarHidden}
       <div data-tauri-drag-region class="flex items-center gap-0.5 px-3 pt-3">
         <button
@@ -646,7 +674,11 @@ onMount(async () => {
         </div>
       </div>
 
-      <div class="flex flex-1 justify-center overflow-y-auto">
+      <div
+        bind:this={threadEl}
+        onscroll={onThreadScroll}
+        class="relative flex flex-1 justify-center overflow-y-auto"
+      >
         <div class="flex w-full max-w-3xl flex-col gap-4 px-6 py-7">
           {#each messages[activeId] ?? [] as m}
             {#if m.role === "user"}
@@ -696,6 +728,15 @@ onMount(async () => {
           {/if}
         </div>
       </div>
+
+      {#if !pinnedToBottom}
+        <button
+          onclick={() => scrollToBottom(true)}
+          transition:fly={{ y: 8, duration: dur(160) }}
+          title="Jump to latest"
+          class="absolute bottom-28 left-1/2 z-20 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-line bg-surface-2 text-ink-dim shadow-[var(--shadow-pop)] transition-colors hover:bg-surface-3 hover:text-ink"
+        ><ChevronDown size={15} /></button>
+      {/if}
 
       <div class="flex justify-center px-6 pb-5">
         <div

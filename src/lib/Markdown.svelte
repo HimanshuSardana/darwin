@@ -7,7 +7,26 @@ import { openExternal } from "./links.js";
 let { source = "", streaming = false, class: klass = "" } = $props();
 
 let hostEl = $state(null);
-let html = $derived(renderMarkdown(source));
+let rendered = $state("");
+let latest = "";
+let scheduled = false;
+let html = $derived(renderMarkdown(rendered));
+
+// While streaming, coalesce rapid deltas so we re-parse markdown at most ~every
+// 60ms instead of once per token. When streaming ends, render the final text.
+$effect(() => {
+  latest = source;
+  if (!streaming) {
+    rendered = latest;
+    return;
+  }
+  if (scheduled) return;
+  scheduled = true;
+  setTimeout(() => {
+    scheduled = false;
+    rendered = latest;
+  }, 60);
+});
 
 function wire() {
   if (!hostEl) return;
@@ -17,8 +36,7 @@ function wire() {
     btn.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const wrapper = btn.closest(".md-code");
-      const code = wrapper?.querySelector("code");
+      const code = btn.closest(".md-code")?.querySelector("code");
       if (!code) return;
       await copyText(code.textContent ?? "");
       const prev = btn.textContent;
@@ -49,9 +67,6 @@ $effect(() => {
 onMount(wire);
 </script>
 
-<div
-  bind:this={hostEl}
-  class="md {klass} {streaming ? 'md-streaming' : ''}"
->
+<div bind:this={hostEl} class="md {klass} {streaming ? 'md-streaming' : ''}">
   {@html html}
 </div>

@@ -46,10 +46,10 @@ Working rules:
 - [x] Commit: `feat(ui): add transitions and list animations`
 
 ## Step 7 — Streaming / live output polish
-- [ ] Markdown-render streaming draft live (throttled)
-- [ ] Blinking caret + thinking indicator
-- [ ] Smart autoscroll with jump-to-bottom
-- [ ] Commit: `feat(ui): live markdown streaming and smart autoscroll`
+- [x] Markdown-render streaming draft live (throttled)
+- [x] Blinking caret + thinking indicator
+- [x] Smart autoscroll with jump-to-bottom
+- [x] Commit: `feat(ui): live markdown streaming and smart autoscroll`
 
 ## Step 8 — Tool call rendering
 - [ ] Group consecutive tool events into collapsible activity blocks
