@@ -3,31 +3,36 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onMount } from "svelte";
+import { fade, fly, scale, slide } from "svelte/transition";
+import { flip } from "svelte/animate";
 import Markdown from "./lib/Markdown.svelte";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  Folder,
-  FolderOpen,
-  Loader2,
-  Minus,
-  MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Pencil,
-  Plus,
-  Search,
-  Send,
-  Settings,
-  Sliders,
-  Sparkles,
-  Square,
-  X,
-} from "lucide-svelte";
+import ArrowLeft from "lucide-svelte/icons/arrow-left";
+import ArrowRight from "lucide-svelte/icons/arrow-right";
+import Check from "lucide-svelte/icons/check";
+import ChevronDown from "lucide-svelte/icons/chevron-down";
+import Folder from "lucide-svelte/icons/folder";
+import FolderOpen from "lucide-svelte/icons/folder-open";
+import Loader2 from "lucide-svelte/icons/loader-2";
+import Minus from "lucide-svelte/icons/minus";
+import MoreHorizontal from "lucide-svelte/icons/more-horizontal";
+import PanelLeftClose from "lucide-svelte/icons/panel-left-close";
+import PanelLeftOpen from "lucide-svelte/icons/panel-left-open";
+import Pencil from "lucide-svelte/icons/pencil";
+import Plus from "lucide-svelte/icons/plus";
+import Search from "lucide-svelte/icons/search";
+import Send from "lucide-svelte/icons/send";
+import Settings from "lucide-svelte/icons/settings";
+import Sliders from "lucide-svelte/icons/sliders-horizontal";
+import Sparkles from "lucide-svelte/icons/sparkles";
+import Square from "lucide-svelte/icons/square";
+import X from "lucide-svelte/icons/x";
 
 const appWindow = getCurrentWindow();
+
+const reducedMotion =
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const dur = (ms) => (reducedMotion ? 0 : ms);
 
 let sessions = $state([]);
 let activeId = $state(null);
@@ -428,6 +433,7 @@ onMount(async () => {
   <!-- ─────────── sidebar ─────────── -->
   {#if !sidebarHidden}
     <aside
+      transition:slide={{ duration: dur(220) }}
       class="flex w-[284px] shrink-0 flex-col border-r border-line/70 bg-surface"
     >
       <div data-tauri-drag-region class="flex items-center gap-0.5 px-3 pt-3 pb-2">
@@ -473,7 +479,10 @@ onMount(async () => {
         ><Plus size={16} class="text-ink-faint" /> New thread</button>
 
         {#if newOpen}
-          <div class="mb-1 flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-2.5">
+          <div
+            transition:fly={{ y: -4, duration: dur(160) }}
+            class="mb-1 flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-2.5"
+          >
             <input
               placeholder="Working dir (optional)"
               bind:value={newCwd}
@@ -502,6 +511,7 @@ onMount(async () => {
           <input
             placeholder="Filter threads…"
             bind:value={searchQuery}
+            transition:fly={{ y: -4, duration: dur(140) }}
             class="mx-0.5 mb-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[13px] outline-none transition-colors focus:border-accent"
           />
         {/if}
@@ -521,9 +531,11 @@ onMount(async () => {
             </span>
             <span class="shrink-0 text-ink-faint opacity-0 transition-opacity hover:opacity-100"><Pencil size={12} /></span>
           </div>
-          {#each list as s}
+          {#each list as s (s.id)}
             <button
               onclick={() => selectSession(s.id)}
+              in:fly={{ y: 6, duration: dur(200) }}
+              animate:flip={{ duration: dur(220) }}
               class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[13.5px] transition-colors {s.id === activeId
                 ? 'bg-accent-soft text-ink'
                 : 'text-ink-dim hover:bg-surface-3 hover:text-ink'}"
@@ -612,7 +624,10 @@ onMount(async () => {
             class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
           ><MoreHorizontal size={17} /></button>
           {#if menuOpen}
-            <div class="absolute top-full right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface-2 p-1 shadow-[var(--shadow-pop)]">
+            <div
+              transition:fly={{ y: -4, duration: dur(150) }}
+              class="absolute top-full right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface-2 p-1 shadow-[var(--shadow-pop)]"
+            >
               <button
                 onclick={() => { renameValue = sessionTitle(activeId); renaming = true; menuOpen = false; }}
                 class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
@@ -635,13 +650,15 @@ onMount(async () => {
         <div class="flex w-full max-w-3xl flex-col gap-4 px-6 py-7">
           {#each messages[activeId] ?? [] as m}
             {#if m.role === "user"}
-              <div class="max-w-[80%] self-end rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-[14.5px] leading-7 whitespace-pre-wrap">
+              <div in:fly={{ y: 8, duration: dur(200) }} class="max-w-[80%] self-end rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-[14.5px] leading-7 whitespace-pre-wrap">
                 {m.text}
               </div>
             {:else if m.role === "assistant"}
-              <Markdown source={m.text} />
+              <div in:fly={{ y: 8, duration: dur(200) }}>
+                <Markdown source={m.text} />
+              </div>
             {:else if m.role === "tool"}
-              <div class="flex items-center gap-2 font-mono text-[11.5px] text-ink-faint">
+              <div in:fade={{ duration: dur(150) }} class="flex items-center gap-2 font-mono text-[11.5px] text-ink-faint">
                 {#if m.phase === "start"}
                   <Loader2 size={12} class="animate-spin" />
                 {:else if m.isError}
@@ -652,19 +669,21 @@ onMount(async () => {
                 <span>{m.tool}</span>
               </div>
             {:else if m.role === "bash"}
-              <pre class="overflow-x-auto rounded-xl border border-line bg-[#0d0d0f] p-3 font-mono text-[11.5px] whitespace-pre-wrap text-ink-faint">{m.text}</pre>
+              <pre in:fade={{ duration: dur(150) }} class="overflow-x-auto rounded-xl border border-line bg-[#0d0d0f] p-3 font-mono text-[11.5px] whitespace-pre-wrap text-ink-faint">{m.text}</pre>
             {:else if m.role === "work"}
-              <div class="flex items-center gap-2 text-[12.5px] text-ink-faint">
+              <div in:fade={{ duration: dur(200) }} class="flex items-center gap-2 text-[12.5px] text-ink-faint">
                 <Sparkles size={12} />
                 <span>{m.text}</span>
               </div>
             {:else}
-              <div class="self-center rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-[12px] text-red-300">{m.text}</div>
+              <div in:fly={{ y: 6, duration: dur(180) }} class="self-center rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-[12px] text-red-300">{m.text}</div>
             {/if}
           {/each}
 
           {#if draft[activeId]}
-            <Markdown source={draft[activeId]} streaming />
+            <div in:fade={{ duration: dur(150) }}>
+              <Markdown source={draft[activeId]} streaming />
+            </div>
           {/if}
 
           {#if (messages[activeId] ?? []).length === 0 && !draft[activeId]}
@@ -723,7 +742,10 @@ onMount(async () => {
                   <ChevronDown size={12} class="shrink-0 text-ink-faint" />
                 </button>
                 {#if modelPickerOpen}
-                  <div class="absolute right-0 bottom-full z-30 mb-2 flex max-h-80 w-80 flex-col overflow-hidden rounded-xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]">
+                  <div
+                    transition:fly={{ y: 6, duration: dur(150) }}
+                    class="absolute right-0 bottom-full z-30 mb-2 flex max-h-80 w-80 flex-col overflow-hidden rounded-xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]"
+                  >
                     <input
                       placeholder="Search models…"
                       bind:value={modelSearch}
@@ -765,7 +787,10 @@ onMount(async () => {
                   <ChevronDown size={12} class="text-ink-faint" />
                 </button>
                 {#if thinkingPickerOpen}
-                  <div class="absolute right-0 bottom-full z-30 mb-2 w-36 overflow-hidden rounded-xl border border-line bg-surface-2 p-1 shadow-[var(--shadow-pop)]">
+                  <div
+                    transition:fly={{ y: 6, duration: dur(150) }}
+                    class="absolute right-0 bottom-full z-30 mb-2 w-36 overflow-hidden rounded-xl border border-line bg-surface-2 p-1 shadow-[var(--shadow-pop)]"
+                  >
                     {#each thinkingLevels[activeId].length ? thinkingLevels[activeId] : ["off", "minimal", "low", "medium", "high"] as lv}
                       <button
                         onclick={() => pickThinking(lv)}
@@ -801,8 +826,14 @@ onMount(async () => {
 </div>
 
 {#if settingsOpen}
-  <div class="fixed inset-0 z-40 grid place-items-center bg-black/60 p-6">
-    <div class="w-[420px] rounded-2xl border border-line bg-surface-2 p-5 shadow-[var(--shadow-pop)]">
+  <div
+    transition:fade={{ duration: dur(160) }}
+    class="fixed inset-0 z-40 grid place-items-center bg-black/60 p-6"
+  >
+    <div
+      transition:scale={{ start: 0.97, duration: dur(180) }}
+      class="w-[420px] rounded-2xl border border-line bg-surface-2 p-5 shadow-[var(--shadow-pop)]"
+    >
       <div class="mb-4 flex items-center gap-2.5">
         <Settings size={17} class="text-ink-dim" />
         <h3 class="text-[15px] font-medium">Settings</h3>

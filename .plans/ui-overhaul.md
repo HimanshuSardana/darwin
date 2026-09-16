@@ -40,10 +40,10 @@ Working rules:
 - [x] Commit: `style(ui): modern visual system with tokens and layered surfaces`
 
 ## Step 6 — Animation / motion
-- [ ] Add `svelte/transition` + `svelte/animate` flip for lists
-- [ ] Animate sidebar collapse, pickers, messages, modal
-- [ ] Respect `prefers-reduced-motion`
-- [ ] Commit: `feat(ui): add transitions and list animations`
+- [x] Add `svelte/transition` + `svelte/animate` flip for lists
+- [x] Animate sidebar collapse, pickers, messages, modal
+- [x] Respect `prefers-reduced-motion`
+- [x] Commit: `feat(ui): add transitions and list animations`
 
 ## Step 7 — Streaming / live output polish
 - [ ] Markdown-render streaming draft live (throttled)
