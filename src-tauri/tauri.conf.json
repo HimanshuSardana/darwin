@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "darwin",
+  "version": "0.1.0",
+  "identifier": "dev.darwin.app",
+  "build": {
+    "devUrl": "http://localhost:1422",
+    "frontendDist": "../dist",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "darwin",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 560
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false }
+}
