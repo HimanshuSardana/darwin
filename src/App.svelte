@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { onMount } from "svelte";
+import Markdown from "./lib/Markdown.svelte";
 
 const appWindow = getCurrentWindow();
 
@@ -549,7 +550,7 @@ onMount(async () => {
             {#if m.role === "user"}
               <div class="max-w-[80%] self-end rounded-2xl bg-[#1e1e21] px-4 py-2.5 text-[15px] leading-7 whitespace-pre-wrap">{m.text}</div>
             {:else if m.role === "assistant"}
-              <div class="text-[15px] leading-7 whitespace-pre-wrap">{m.text}</div>
+              <Markdown source={m.text} />
             {:else if m.role === "tool"}
               <div class="font-mono text-xs text-zinc-500">{m.text}</div>
             {:else if m.role === "work"}
@@ -561,7 +562,7 @@ onMount(async () => {
             {/if}
           {/each}
           {#if draft[activeId]}
-            <div class="text-[15px] leading-7 whitespace-pre-wrap">{draft[activeId]}▍</div>
+            <Markdown source={draft[activeId]} streaming />
           {/if}
           {#if (messages[activeId] ?? []).length === 0 && !draft[activeId]}
             <p class="pt-10 text-center text-[15px] text-zinc-600">Ask pi to read, write, or run anything in this folder.</p>
