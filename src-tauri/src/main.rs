@@ -52,6 +52,37 @@ fn abort_session(registry: tauri::State<PiRegistry>, session_id: String) -> Resu
 }
 
 #[tauri::command]
+fn request_state(
+    registry: tauri::State<PiRegistry>,
+    session_id: String,
+) -> Result<(), String> {
+    registry.request_state(&session_id)
+}
+
+#[tauri::command]
+fn request_models(
+    registry: tauri::State<PiRegistry>,
+    session_id: String,
+) -> Result<(), String> {
+    registry.request_models(&session_id)
+}
+
+#[tauri::command]
+fn set_model(
+    registry: tauri::State<PiRegistry>,
+    session_id: String,
+    provider: String,
+    model_id: String,
+) -> Result<(), String> {
+    registry.set_model(&session_id, &provider, &model_id)
+}
+
+#[tauri::command]
+fn cycle_model(registry: tauri::State<PiRegistry>, session_id: String) -> Result<(), String> {
+    registry.cycle_model(&session_id)
+}
+
+#[tauri::command]
 fn get_events(
     registry: tauri::State<PiRegistry>,
     session_id: String,
@@ -78,6 +109,10 @@ fn main() {
             send_steer,
             send_follow_up,
             abort_session,
+            request_state,
+            request_models,
+            set_model,
+            cycle_model,
             get_events,
             destroy_session,
         ])

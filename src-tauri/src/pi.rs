@@ -192,6 +192,37 @@ impl PiRegistry {
         self.write_json(session_id, serde_json::json!({ "type": "abort" }))
     }
 
+    pub fn request_state(&self, session_id: &str) -> Result<(), String> {
+        self.write_json(session_id, serde_json::json!({ "type": "get_state" }))
+    }
+
+    pub fn request_models(&self, session_id: &str) -> Result<(), String> {
+        self.write_json(
+            session_id,
+            serde_json::json!({ "type": "get_available_models" }),
+        )
+    }
+
+    pub fn set_model(
+        &self,
+        session_id: &str,
+        provider: &str,
+        model_id: &str,
+    ) -> Result<(), String> {
+        self.write_json(
+            session_id,
+            serde_json::json!({
+                "type": "set_model",
+                "provider": provider,
+                "modelId": model_id,
+            }),
+        )
+    }
+
+    pub fn cycle_model(&self, session_id: &str) -> Result<(), String> {
+        self.write_json(session_id, serde_json::json!({ "type": "cycle_model" }))
+    }
+
     pub fn get_events(
         &self,
         session_id: &str,
