@@ -519,6 +519,11 @@ function onGlobalKeydown(e) {
   if (mod && e.key.toLowerCase() === "n") {
     e.preventDefault();
     createSession(null);
+    return;
+  }
+  if (e.key === "Escape") {
+    if (settingsOpen) settingsOpen = false;
+    else if (commandOpen) commandOpen = false;
   }
 }
 
@@ -947,19 +952,23 @@ onMount(async () => {
 </div>
 
 {#if settingsOpen}
-  <div
-    transition:fade={{ duration: dur(160) }}
-    class="fixed inset-0 z-40 grid place-items-center bg-black/60 p-6"
-    onclick={() => (settingsOpen = false)}
-    role="presentation"
-  >
-    <div
-      transition:scale={{ start: 0.97, duration: dur(180) }}
-      onclick={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      class="w-[460px] overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]"
-    >
+  <div class="fixed inset-0 z-40">
+    <button
+      type="button"
+      aria-label="Close settings"
+      transition:fade={{ duration: dur(160) }}
+      class="absolute inset-0 cursor-default bg-black/60"
+      onclick={() => (settingsOpen = false)}
+    ></button>
+    <div class="pointer-events-none absolute inset-0 grid place-items-center p-6">
+      <div
+        transition:scale={{ start: 0.97, duration: dur(180) }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        tabindex="-1"
+        class="pointer-events-auto w-[460px] overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]"
+      >
       <div class="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
         <Settings size={16} class="text-ink-dim" />
         <h3 class="text-[14.5px] font-medium">Settings</h3>
@@ -1011,6 +1020,7 @@ onMount(async () => {
           onclick={() => (settingsOpen = false)}
           class="w-full rounded-xl bg-ink py-2 text-[13px] font-medium text-black transition-colors hover:bg-white"
         >Close</button>
+      </div>
       </div>
     </div>
   </div>

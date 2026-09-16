@@ -63,7 +63,27 @@ Working rules:
 - [x] Commit: `feat(ui): command palette and settings polish`
 
 ## Step 10 — Final verification
-- [ ] `bun run build` green
-- [ ] `cargo check` green
-- [ ] README notes for UI structure and shortcuts
-- [ ] Commit: `docs: note ui structure and shortcuts`
+- [x] `bun run build` green
+- [x] `cargo check` green
+- [x] README notes for UI structure and shortcuts
+- [x] Commit: `docs: note ui structure and shortcuts`
+
+---
+
+## Done
+
+All steps complete. Committed history:
+
+1. `chore(deps): add icons and markdown renderer`
+2. `feat(markdown): render assistant output as sanitized html`
+3. `feat(ui): markdown message component with code blocks`
+4. `refactor(ui): replace emoji glyphs with lucide icons`
+5. `style(ui): modern visual system with tokens and layered surfaces`
+6. `feat(ui): add transitions and list animations`
+7. `feat(ui): live markdown streaming and smart autoscroll`
+8. `feat(ui): structured tool activity timeline`
+9. `feat(ui): command palette and settings polish`
+10. `docs: note ui structure and shortcuts`
+
+Verified: `bun run build` (no warnings), `cargo check` clean, and
+`npx tauri dev` launches the window with vite on :1422 and no runtime errors.

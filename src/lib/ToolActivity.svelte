@@ -16,13 +16,16 @@ const dur = (ms) => (reducedMotion ? 0 : ms);
 
 const LINE_LIMIT = 12;
 
-let open = $state(running);
+let open = $state(false);
 let expandedOutputs = $state({});
+let wasRunning = $state(false);
 
-// Follow the run: expand while tools are executing, collapse to the summary
-// once the block settles.
+// Follow the run: expand when tools start executing, collapse to the summary
+// once the block settles. User toggles are preserved while idle.
 $effect(() => {
-  open = running ? true : open;
+  if (running && !wasRunning) open = true;
+  if (!running && wasRunning) open = false;
+  wasRunning = running;
 });
 
 const done = $derived(items.length > 0 && items.every((i) => i.status !== "running"));

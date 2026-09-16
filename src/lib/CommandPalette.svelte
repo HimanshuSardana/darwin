@@ -98,19 +98,23 @@ $effect(() => {
 </script>
 
 {#if open}
-  <div
-    transition:fade={{ duration: dur(120) }}
-    class="fixed inset-0 z-50 flex justify-center bg-black/50 pt-[14vh]"
-    onclick={onClose}
-    role="presentation"
-  >
-    <div
-      transition:scale={{ start: 0.98, duration: dur(140) }}
-      onclick={(e) => e.stopPropagation()}
-      role="dialog"
-      aria-modal="true"
-      class="flex max-h-[60vh] w-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]"
-    >
+  <div class="fixed inset-0 z-50 pt-[14vh]">
+    <button
+      type="button"
+      aria-label="Close command palette"
+      transition:fade={{ duration: dur(120) }}
+      class="absolute inset-0 cursor-default bg-black/50"
+      onclick={onClose}
+    ></button>
+    <div class="pointer-events-none absolute inset-0 flex justify-center">
+      <div
+        transition:scale={{ start: 0.98, duration: dur(140) }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+        tabindex="-1"
+        class="pointer-events-auto flex max-h-[60vh] w-[560px] flex-col overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]"
+      >
       <div class="flex items-center gap-2.5 border-b border-line px-4 py-3">
         <Search size={15} class="shrink-0 text-ink-faint" />
         <input
@@ -152,6 +156,7 @@ $effect(() => {
         {#if results.length === 0}
           <p class="px-3 py-6 text-center text-[13px] text-ink-faint">No matches.</p>
         {/if}
+      </div>
       </div>
     </div>
   </div>
