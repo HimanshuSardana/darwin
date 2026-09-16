@@ -151,88 +151,71 @@ onMount(async () => {
 });
 </script>
 
-<div class="layout">
-  <aside class="side">
-    <h1>darwin</h1>
-    <div class="newrow">
-      <input placeholder="cwd (optional)" bind:value={cwdInput} />
-      <button onclick={createSession}>+ session</button>
+<div class="flex h-full bg-zinc-950 text-zinc-100 dark">
+  <aside class="flex w-72 flex-col gap-3 border-r border-zinc-800 bg-zinc-900 p-3">
+    <h1 class="text-xl font-bold tracking-widest">darwin</h1>
+    <div class="flex gap-2">
+      <input
+        placeholder="cwd (optional)"
+        bind:value={cwdInput}
+        class="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+      />
+      <button
+        onclick={createSession}
+        class="rounded-md border border-zinc-700 bg-zinc-800 px-2.5 py-1.5 text-sm hover:bg-zinc-700"
+      >+ session</button>
     </div>
-    <div class="list">
+    <div class="flex flex-col gap-1.5 overflow-y-auto">
       {#each sessions as s}
         <button
-          class="sess"
-          class:active={s.id === activeId}
           onclick={() => selectSession(s.id)}
+          class="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left hover:bg-zinc-800 {s.id === activeId ? 'border-blue-500' : 'border-zinc-700 bg-zinc-900'}"
         >
-          <span class="dot" class:alive={s.alive}></span>
-          <span class="mono">{s.id}</span>
-          <span class="cwd">{s.cwd}</span>
+          <span class="h-2 w-2 shrink-0 rounded-full {s.alive ? 'bg-green-400' : 'bg-zinc-600'}"></span>
+          <span class="font-mono text-xs">{s.id}</span>
+          <span class="truncate text-[11px] opacity-60">{s.cwd}</span>
         </button>
       {/each}
       {#if sessions.length === 0}
-        <p class="hint">No sessions yet. Create one to spawn <code>pi --mode rpc</code>.</p>
+        <p class="text-[13px] opacity-60">No sessions yet. Create one to spawn <code class="font-mono">pi --mode rpc</code>.</p>
       {/if}
     </div>
-    {#if error}<pre class="err">{error}</pre>{/if}
+    {#if error}<pre class="whitespace-pre-wrap text-xs text-red-400">{error}</pre>{/if}
   </aside>
 
-  <main class="chat">
+  <main class="flex flex-1 flex-col">
     {#if !activeId}
-      <p class="hint">Create or pick a session to chat with pi.</p>
+      <p class="p-4 text-sm opacity-60">Create or pick a session to chat with pi.</p>
     {:else}
-      <div class="thread">
+      <div class="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
         {#each messages[activeId] ?? [] as m}
-          <div class="msg {m.role}">{m.text}</div>
+          {#if m.role === 'user'}
+            <div class="max-w-[75ch] self-end rounded-xl bg-blue-900 px-3 py-2 text-sm whitespace-pre-wrap">{m.text}</div>
+          {:else if m.role === 'tool'}
+            <div class="self-start font-mono text-xs opacity-75">{m.text}</div>
+          {:else if m.role === 'system'}
+            <div class="self-center text-xs text-red-300">{m.text}</div>
+          {:else}
+            <div class="max-w-[75ch] self-start rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm whitespace-pre-wrap">{m.text}</div>
+          {/if}
         {/each}
         {#if draft[activeId]}
-          <div class="msg assistant streaming">{draft[activeId]}▍</div>
+          <div class="max-w-[75ch] self-start rounded-xl border border-blue-500 bg-zinc-900 px-3 py-2 text-sm whitespace-pre-wrap">{draft[activeId]}▍</div>
         {/if}
       </div>
-      <div class="composer">
+      <div class="flex gap-2 border-t border-zinc-800 p-3">
         <input
           placeholder={streaming[activeId] ? "Agent running — Enter steers it…" : "Message pi…"}
           bind:value={input}
           onkeydown={(e) => e.key === "Enter" && send()}
+          class="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
         />
-        <button onclick={send}>Send</button>
+        <button onclick={send} class="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm hover:bg-zinc-700">Send</button>
         {#if streaming[activeId]}
-          <button class="danger" onclick={abort}>Abort</button>
+          <button onclick={abort} class="rounded-md border border-red-900 bg-zinc-800 px-3 py-2 text-sm hover:bg-zinc-700">Abort</button>
         {/if}
-        <button class="ghost" onclick={destroy} title="Kill pi child">✕</button>
+        <button onclick={destroy} title="Kill pi child" class="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm opacity-60 hover:bg-zinc-700">✕</button>
       </div>
     {/if}
   </main>
 </div>
-
-<style>
-.layout { display: flex; height: 100%; }
-.side { width: 300px; border-right: 1px solid #222a35; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: #10141b; }
-.side h1 { margin: 0; font-size: 20px; letter-spacing: 1px; }
-.newrow { display: flex; gap: 6px; }
-.newrow input { flex: 1; min-width: 0; background: #0c0e12; border: 1px solid #2a3342; color: inherit; border-radius: 6px; padding: 6px 8px; }
-button { background: #1d2532; color: inherit; border: 1px solid #2e394b; border-radius: 6px; padding: 6px 10px; }
-button:hover { background: #263042; }
-.list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
-.sess { display: flex; gap: 8px; align-items: center; text-align: left; }
-.sess.active { border-color: #4f8cff; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
-.dot.alive { background: #3ddc84; }
-.mono { font-family: ui-monospace, monospace; font-size: 12px; }
-.cwd { font-size: 11px; opacity: 0.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hint { opacity: 0.6; font-size: 13px; }
-.err { color: #ff7a7a; font-size: 12px; white-space: pre-wrap; }
-.chat { flex: 1; display: flex; flex-direction: column; }
-.thread { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-.msg { max-width: 75ch; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; font-size: 14px; }
-.msg.user { align-self: flex-end; background: #1c3a5e; }
-.msg.assistant { align-self: flex-start; background: #161c26; border: 1px solid #232c3d; }
-.msg.assistant.streaming { border-color: #4f8cff; }
-.msg.tool { align-self: flex-start; font-family: ui-monospace, monospace; font-size: 12px; opacity: 0.75; }
-.msg.system { align-self: center; font-size: 12px; color: #ff9d9d; }
-.composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #222a35; }
-.composer input { flex: 1; background: #0c0e12; border: 1px solid #2a3342; color: inherit; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
-button.danger { border-color: #7a2e2e; }
-button.ghost { opacity: 0.6; }
-code { font-family: ui-monospace, monospace; }
-</style>
