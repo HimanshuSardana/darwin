@@ -83,6 +83,28 @@ fn cycle_model(registry: tauri::State<PiRegistry>, session_id: String) -> Result
 }
 
 #[tauri::command]
+fn request_thinking_levels(
+    registry: tauri::State<PiRegistry>,
+    session_id: String,
+) -> Result<(), String> {
+    registry.request_thinking_levels(&session_id)
+}
+
+#[tauri::command]
+fn set_thinking_level(
+    registry: tauri::State<PiRegistry>,
+    session_id: String,
+    level: String,
+) -> Result<(), String> {
+    registry.set_thinking_level(&session_id, &level)
+}
+
+#[tauri::command]
+fn app_info(registry: tauri::State<PiRegistry>) -> pi::AppInfo {
+    pi::app_info(registry.session_count())
+}
+
+#[tauri::command]
 fn get_events(
     registry: tauri::State<PiRegistry>,
     session_id: String,
@@ -113,6 +135,9 @@ fn main() {
             request_models,
             set_model,
             cycle_model,
+            request_thinking_levels,
+            set_thinking_level,
+            app_info,
             get_events,
             destroy_session,
         ])

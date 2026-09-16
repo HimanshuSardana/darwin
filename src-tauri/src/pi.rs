@@ -45,6 +45,33 @@ struct SessionInner {
     alive: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AppInfo {
+    pub pi_bin: String,
+    pub pi_version: String,
+    pub session_root: String,
+    pub sessions: usize,
+}
+
+pub fn app_info(sessions: usize) -> AppInfo {
+    let bin = pi_binary();
+    let pi_version = std::process::Command::new(&bin)
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    AppInfo {
+        pi_bin: bin,
+        pi_version,
+        session_root: format!("{home}/.darwin/sessions"),
+        sessions,
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct PiRegistry {
     inner: Arc<Mutex<HashMap<String, Arc<Mutex<SessionInner>>>>>,
@@ -221,6 +248,24 @@ impl PiRegistry {
 
     pub fn cycle_model(&self, session_id: &str) -> Result<(), String> {
         self.write_json(session_id, serde_json::json!({ "type": "cycle_model" }))
+    }
+
+    pub fn request_thinking_levels(&self, session_id: &str) -> Result<(), String> {
+        self.write_json(
+            session_id,
+            serde_json::json!({ "type": "get_available_thinking_levels" }),
+        )
+    }
+
+    pub fn set_thinking_level(&self, session_id: &str, level: &str) -> Result<(), String> {
+        self.write_json(
+            session_id,
+            serde_json::json!({ "type": "set_thinking_level", "level": level }),
+        )
+    }
+
+    pub fn session_count(&self) -> usize {
+        self.inner.lock().map(|m| m.len()).unwrap_or(0)
     }
 
     pub fn get_events(
