@@ -9,8 +9,8 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
-  ChevronRight,
   Folder,
+  FolderOpen,
   Loader2,
   Minus,
   MoreHorizontal,
@@ -21,6 +21,8 @@ import {
   Search,
   Send,
   Settings,
+  Sliders,
+  Sparkles,
   Square,
   X,
 } from "lucide-svelte";
@@ -29,27 +31,25 @@ const appWindow = getCurrentWindow();
 
 let sessions = $state([]);
 let activeId = $state(null);
-let rawEvents = $state({}); // sessionId -> raw pi events
-let messages = $state({}); // sessionId -> thread items
-let draft = $state({}); // sessionId -> in-progress assistant text
-let titles = $state({}); // sessionId -> title
-let turnStartAt = $state({}); // sessionId -> ms timestamp
+let rawEvents = $state({});
+let messages = $state({});
+let draft = $state({});
+let titles = $state({});
+let turnStartAt = $state({});
 let input = $state("");
 let error = $state("");
-let streaming = $state({}); // sessionId -> bool
+let streaming = $state({});
 
-// model + thinking state
-let models = $state({}); // sessionId -> [{id, name, provider, reasoning}]
-let currentModel = $state({}); // sessionId -> {id, name, provider} | null
-let thinkingLevels = $state({}); // sessionId -> string[]
-let thinkingLevel = $state({}); // sessionId -> string | null
-let pendingThinking = $state({}); // sessionId -> level sent, awaiting confirm
+let models = $state({});
+let currentModel = $state({});
+let thinkingLevels = $state({});
+let thinkingLevel = $state({});
+let pendingThinking = $state({});
 let modelPickerOpen = $state(false);
 let thinkingPickerOpen = $state(false);
 let modelSearch = $state("");
 let modelsLoading = $state({});
 
-// sidebar state
 let sidebarHidden = $state(false);
 let searchOpen = $state(false);
 let searchQuery = $state("");
@@ -58,7 +58,6 @@ let newCwd = $state("");
 let backStack = $state([]);
 let fwdStack = $state([]);
 
-// header / settings state
 let menuOpen = $state(false);
 let renaming = $state(false);
 let renameValue = $state("");
@@ -66,6 +65,17 @@ let settingsOpen = $state(false);
 let appInfo = $state(null);
 
 let composerEl = $state(null);
+let threadEl = $state(null);
+let pinnedToBottom = $state(true);
+
+const MODELS_BY_PROVIDER = (list) => {
+  const groups = {};
+  for (const m of list) {
+    const p = m.provider ?? "other";
+    (groups[p] ??= []).push(m);
+  }
+  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+};
 
 function ensureSession(id) {
   if (!rawEvents[id]) rawEvents[id] = [];
@@ -80,8 +90,7 @@ function ensureSession(id) {
 function fmtElapsed(ms) {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 60) return `Worked for ${s}s`;
-  const m = Math.floor(s / 60);
-  return `Worked for ${m}m ${s % 60}s`;
+  return `Worked for ${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
 function relTime(iso) {
@@ -112,11 +121,7 @@ function groupedSessions() {
   const groups = new Map();
   for (const s of sessions) {
     const title = sessionTitle(s.id);
-    if (
-      q &&
-      !`${title} ${s.cwd ?? ""}`.toLowerCase().includes(q)
-    )
-      continue;
+    if (q && !`${title} ${s.cwd ?? ""}`.toLowerCase().includes(q)) continue;
     const p = projectOf(s);
     if (!groups.has(p)) groups.set(p, []);
     groups.get(p).push(s);
@@ -139,26 +144,16 @@ function filteredModels(id) {
   );
 }
 
-function groupedModels(id) {
-  const groups = {};
-  for (const m of filteredModels(id)) {
-    const p = m.provider ?? "other";
-    if (!groups[p]) groups[p] = [];
-    groups[p].push(m);
-  }
-  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-}
-
 function applyEvent(sessionId, ev) {
   ensureSession(sessionId);
   rawEvents[sessionId].push(ev);
   const t = ev?.type;
 
-  if (t === "agent_start" || t === "turn_start") {
+  if (t === "agent_start" || t === "turn_start" || t === "message_start") {
     streaming[sessionId] = true;
-    if (turnStartAt[sessionId] == null) turnStartAt[sessionId] = Date.now();
+    if (t === "turn_start" && turnStartAt[sessionId] == null)
+      turnStartAt[sessionId] = Date.now();
   }
-  if (t === "message_start") streaming[sessionId] = true;
   if (t === "turn_end" || t === "agent_end" || t === "agent_settled") {
     streaming[sessionId] = false;
     if (draft[sessionId]) {
@@ -173,16 +168,13 @@ function applyEvent(sessionId, ev) {
       turnStartAt[sessionId] = null;
     }
   }
-  if (t === "message_end") {
-    if (draft[sessionId]) {
-      messages[sessionId].push({ role: "assistant", text: draft[sessionId] });
-      draft[sessionId] = "";
-    }
+  if (t === "message_end" && draft[sessionId]) {
+    messages[sessionId].push({ role: "assistant", text: draft[sessionId] });
+    draft[sessionId] = "";
   }
   if (t === "message_update") {
     const inner = ev.assistantMessageEvent ?? ev.messageEvent ?? {};
-    const kind = inner.type ?? "";
-    if (kind === "text_delta" && typeof inner.delta === "string") {
+    if (inner.type === "text_delta" && typeof inner.delta === "string") {
       draft[sessionId] += inner.delta;
     } else if (typeof inner.text === "string") {
       draft[sessionId] += inner.text;
@@ -204,10 +196,7 @@ function applyEvent(sessionId, ev) {
     });
   }
   if (t === "bash_execution_update" && ev.output) {
-    messages[sessionId].push({
-      role: "bash",
-      text: String(ev.output),
-    });
+    messages[sessionId].push({ role: "bash", text: String(ev.output) });
   }
   if (t === "response" && ev.command === "get_available_models" && ev.success) {
     models[sessionId] = ev.data?.models ?? [];
@@ -278,7 +267,7 @@ async function createSession(cwd) {
   try {
     const id = await invoke("create_session", { cwd: cwd?.trim() || null });
     await refreshSessions();
-    backStack.push(activeId);
+    if (activeId) backStack.push(activeId);
     fwdStack = [];
     activeId = id;
     ensureSession(id);
@@ -337,7 +326,7 @@ function goFwd() {
 function autoresize() {
   if (!composerEl) return;
   composerEl.style.height = "auto";
-  composerEl.style.height = Math.min(composerEl.scrollHeight, 200) + "px";
+  composerEl.style.height = Math.min(composerEl.scrollHeight, 220) + "px";
 }
 
 async function send() {
@@ -349,6 +338,7 @@ async function send() {
   if (isFirst && !titles[activeId]) titles[activeId] = text.slice(0, 42);
   input = "";
   if (composerEl) composerEl.style.height = "auto";
+  pinnedToBottom = true;
   try {
     if (streaming[activeId]) {
       await invoke("send_steer", { sessionId: activeId, message: text });
@@ -420,15 +410,9 @@ async function openSettings() {
   settingsOpen = true;
 }
 
-async function winMin() {
-  await appWindow.minimize();
-}
-async function winMax() {
-  await appWindow.toggleMaximize();
-}
-async function winClose() {
-  await appWindow.close();
-}
+const winMin = () => appWindow.minimize();
+const winMax = () => appWindow.toggleMaximize();
+const winClose = () => appWindow.close();
 
 onMount(async () => {
   await refreshSessions();
@@ -440,144 +424,226 @@ onMount(async () => {
 });
 </script>
 
-<div class="flex h-full bg-black text-zinc-100">
-  <!-- sidebar -->
+<div class="flex h-full bg-canvas text-ink">
+  <!-- ─────────── sidebar ─────────── -->
   {#if !sidebarHidden}
-    <aside class="flex w-[300px] shrink-0 flex-col border-r border-zinc-800/70 bg-[#0c0c0e]">
-      <div data-tauri-drag-region class="flex items-center gap-1.5 px-3 pt-3 pb-1">
-        <button onclick={winClose} title="Close" class="rounded p-1.5 hover:bg-zinc-800">
-          <span class="block h-2.5 w-2.5 rounded-full bg-zinc-700"></span>
+    <aside
+      class="flex w-[284px] shrink-0 flex-col border-r border-line/70 bg-surface"
+    >
+      <div data-tauri-drag-region class="flex items-center gap-0.5 px-3 pt-3 pb-2">
+        <button
+          onclick={winClose}
+          title="Close"
+          class="group grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-surface-3"
+        >
+          <span class="h-2.5 w-2.5 rounded-full bg-line-strong transition-colors group-hover:bg-red-400"></span>
         </button>
-        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Minus size={14} /></button>
-        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Square size={12} /></button>
-        <span class="w-1"></span>
-        <button onclick={() => (sidebarHidden = true)} title="Hide sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><PanelLeftClose size={16} /></button>
-        <button onclick={goBack} title="Back" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><ArrowLeft size={16} /></button>
-        <button onclick={goFwd} title="Forward" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><ArrowRight size={16} /></button>
+        <button
+          onclick={winMin}
+          title="Minimize"
+          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        ><Minus size={14} /></button>
+        <button
+          onclick={winMax}
+          title="Maximize"
+          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        ><Square size={11} /></button>
+        <span class="mx-1 h-4 w-px bg-line"></span>
+        <button
+          onclick={() => (sidebarHidden = true)}
+          title="Hide sidebar"
+          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        ><PanelLeftClose size={15} /></button>
+        <button
+          onclick={goBack}
+          title="Back"
+          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        ><ArrowLeft size={15} /></button>
+        <button
+          onclick={goFwd}
+          title="Forward"
+          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        ><ArrowRight size={15} /></button>
       </div>
 
-      <div class="flex flex-col gap-0.5 px-3 pt-2">
+      <div class="flex flex-col gap-0.5 px-2.5 pt-1">
         <button
-          onclick={() => { newOpen = !newOpen; }}
-          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70"
-        >
-          <span class="flex items-center gap-2.5"><Folder size={16} class="text-zinc-400" /> New thread</span>
-        </button>
+          onclick={() => { newOpen = !newOpen; searchOpen = false; }}
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+        ><Plus size={16} class="text-ink-faint" /> New thread</button>
+
         {#if newOpen}
-          <div class="flex flex-col gap-2 rounded-lg bg-zinc-900 p-2.5">
+          <div class="mb-1 flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-2.5">
             <input
               placeholder="Working dir (optional)"
               bind:value={newCwd}
               onkeydown={(e) => e.key === "Enter" && createSession(newCwd)}
-              class="rounded-md border border-zinc-700 bg-black px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+              class="rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[13px] outline-none transition-colors focus:border-accent"
             />
             <div class="flex gap-2">
-              <button onclick={() => createSession(newCwd)} class="flex-1 rounded-md bg-zinc-100 px-2 py-1.5 text-sm font-medium text-black hover:bg-white">Create</button>
-              <button onclick={() => (newOpen = false)} class="rounded-md border border-zinc-700 px-2 py-1.5 text-sm hover:bg-zinc-800">Cancel</button>
+              <button
+                onclick={() => createSession(newCwd)}
+                class="flex-1 rounded-lg bg-ink px-2 py-1.5 text-[13px] font-medium text-black transition-colors hover:bg-white"
+              >Create</button>
+              <button
+                onclick={() => (newOpen = false)}
+                class="rounded-lg border border-line px-2.5 py-1.5 text-[13px] text-ink-dim transition-colors hover:bg-surface-3"
+              >Cancel</button>
             </div>
           </div>
         {/if}
+
         <button
-          onclick={() => { searchOpen = !searchOpen; searchQuery = ""; }}
-          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70"
-        >
-          <span class="flex items-center gap-2.5"><Search size={16} class="text-zinc-400" /> Search</span>
-        </button>
+          onclick={() => { searchOpen = !searchOpen; searchQuery = ""; newOpen = false; }}
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+        ><Search size={16} class="text-ink-faint" /> Search</button>
+
         {#if searchOpen}
           <input
             placeholder="Filter threads…"
             bind:value={searchQuery}
-            class="mx-0.5 rounded-md border border-zinc-700 bg-black px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+            class="mx-0.5 mb-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[13px] outline-none transition-colors focus:border-accent"
           />
         {/if}
       </div>
 
-      <div class="mt-3 flex-1 overflow-y-auto px-3 pb-2">
+      <div class="mt-3 flex-1 overflow-y-auto px-2.5 pb-2">
         {#if groupedSessions().length}
-          <p class="px-2.5 pt-3 pb-1 text-[15px] text-zinc-400">Projects</p>
+          <p class="px-2.5 pt-2 pb-1.5 text-[11px] font-semibold tracking-wider text-ink-faint uppercase">
+            Projects
+          </p>
         {/if}
         {#each groupedSessions() as [project, list]}
-          <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[15px]">
-            <span class="flex items-center gap-2.5"><Folder size={16} class="text-zinc-400" /> {project}</span>
-            <span class="text-zinc-600"><Pencil size={13} /></span>
+          <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[13.5px] text-ink-dim">
+            <span class="flex min-w-0 items-center gap-2.5">
+              <FolderOpen size={15} class="shrink-0 text-ink-faint" />
+              <span class="truncate">{project}</span>
+            </span>
+            <span class="shrink-0 text-ink-faint opacity-0 transition-opacity hover:opacity-100"><Pencil size={12} /></span>
           </div>
           {#each list as s}
             <button
               onclick={() => selectSession(s.id)}
-              class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70 {s.id === activeId ? 'bg-zinc-800/80' : ''}"
+              class="mt-0.5 flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[13.5px] transition-colors {s.id === activeId
+                ? 'bg-accent-soft text-ink'
+                : 'text-ink-dim hover:bg-surface-3 hover:text-ink'}"
             >
-              <span class="flex items-center gap-2 truncate"><span class={s.alive ? "h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" : "h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-600"}></span><span class="truncate">{sessionTitle(s.id)}</span></span>
-              <span class="shrink-0 text-[13px] text-zinc-500">{relTime(s.created_at)}</span>
+              <span class="flex min-w-0 items-center gap-2">
+                <span
+                  class="h-1.5 w-1.5 shrink-0 rounded-full {s.alive ? 'bg-emerald-400' : 'bg-ink-faint/50'}"
+                ></span>
+                <span class="truncate">{sessionTitle(s.id)}</span>
+              </span>
+              <span class="shrink-0 text-[11.5px] text-ink-faint">{relTime(s.created_at)}</span>
             </button>
           {/each}
         {/each}
         {#if sessions.length === 0}
-          <p class="px-2.5 pt-4 text-sm text-zinc-500">No threads yet. Start one above.</p>
+          <div class="flex flex-col items-center gap-2 px-4 pt-10 text-center">
+            <Folder size={22} class="text-ink-faint" />
+            <p class="text-[13px] text-ink-faint">No threads yet.</p>
+          </div>
         {/if}
       </div>
 
-      {#if error}<pre class="max-h-24 overflow-y-auto px-5 pb-1 text-xs whitespace-pre-wrap text-red-400">{error}</pre>{/if}
+      {#if error}
+        <pre class="mx-2.5 mb-1 max-h-24 overflow-y-auto rounded-lg border border-red-900/50 bg-red-950/30 px-2.5 py-2 text-[11px] whitespace-pre-wrap text-red-300">{error}</pre>
+      {/if}
 
-      <div class="p-3">
-        <button onclick={openSettings} class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[15px] hover:bg-zinc-800/70">
-          <span class="flex items-center gap-2.5"><Settings size={16} class="text-zinc-400" /> Settings</span>
-        </button>
+      <div class="p-2.5">
+        <button
+          onclick={openSettings}
+          class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+        ><Settings size={16} class="text-ink-faint" /> Settings</button>
       </div>
     </aside>
   {/if}
 
-  <!-- main -->
-  <main class="flex min-w-0 flex-1 flex-col">
+  <!-- ─────────── main ─────────── -->
+  <main class="flex min-w-0 flex-1 flex-col bg-canvas">
     {#if sidebarHidden}
-      <div data-tauri-drag-region class="flex items-center gap-1 px-3 pt-3">
-        <button onclick={() => (sidebarHidden = false)} title="Show sidebar" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><PanelLeftOpen size={16} /></button>
-        <button onclick={winMin} title="Minimize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Minus size={14} /></button>
-        <button onclick={winMax} title="Maximize" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><Square size={12} /></button>
-        <button onclick={winClose} title="Close" class="rounded p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"><X size={16} /></button>
+      <div data-tauri-drag-region class="flex items-center gap-0.5 px-3 pt-3">
+        <button
+          onclick={() => (sidebarHidden = false)}
+          title="Show sidebar"
+          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+        ><PanelLeftOpen size={15} /></button>
+        <span class="mx-1 h-4 w-px bg-line"></span>
+        <button onclick={winMin} title="Minimize" class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"><Minus size={14} /></button>
+        <button onclick={winMax} title="Maximize" class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"><Square size={11} /></button>
+        <button onclick={winClose} title="Close" class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"><X size={15} /></button>
       </div>
     {/if}
 
     {#if !activeId}
-      <div class="flex flex-1 items-center justify-center">
-        <p class="text-[15px] text-zinc-500">Create a thread to chat with pi.</p>
+      <div class="flex flex-1 flex-col items-center justify-center gap-3">
+        <div class="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-surface-2">
+          <Sparkles size={20} class="text-ink-dim" />
+        </div>
+        <p class="text-[14px] text-ink-dim">Create a thread to chat with pi</p>
+        <button
+          onclick={() => createSession(null)}
+          class="mt-1 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-medium text-black transition-colors hover:bg-white"
+        >New thread</button>
       </div>
     {:else}
-      <div data-tauri-drag-region class="flex items-center justify-between border-b border-zinc-800/70 px-5 py-3">
+      <div
+        data-tauri-drag-region
+        class="flex items-center justify-between gap-3 border-b border-line/70 px-5 py-3"
+      >
         {#if renaming}
           <input
             bind:value={renameValue}
             onkeydown={(e) => {
-              if (e.key === "Enter") { titles[activeId] = renameValue.trim() || sessionTitle(activeId); renaming = false; }
+              if (e.key === "Enter") {
+                titles[activeId] = renameValue.trim() || sessionTitle(activeId);
+                renaming = false;
+              }
               if (e.key === "Escape") renaming = false;
             }}
-            class="w-72 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[15px] outline-none focus:border-blue-500"
+            class="w-80 rounded-lg border border-line bg-surface-2 px-2.5 py-1.5 text-[14px] outline-none transition-colors focus:border-accent"
           />
         {:else}
-          <h2 class="truncate text-[17px] font-medium">{sessionTitle(activeId)}</h2>
+          <h2 class="truncate text-[14.5px] font-medium">{sessionTitle(activeId)}</h2>
         {/if}
         <div class="relative">
-          <button onclick={() => (menuOpen = !menuOpen)} class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"><MoreHorizontal size={18} /></button>
+          <button
+            onclick={() => (menuOpen = !menuOpen)}
+            class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+          ><MoreHorizontal size={17} /></button>
           {#if menuOpen}
-            <div class="absolute top-full right-0 z-30 mt-1 w-44 overflow-hidden rounded-lg border border-zinc-700 bg-[#141416] shadow-xl">
-              <button onclick={() => { renameValue = sessionTitle(activeId); renaming = true; menuOpen = false; }} class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-800">Rename</button>
-              <button onclick={() => { menuOpen = false; abort(); }} class="block w-full px-3 py-2 text-left text-sm hover:bg-zinc-800">Abort run</button>
-              <button onclick={destroy} class="block w-full px-3 py-2 text-left text-sm text-red-300 hover:bg-zinc-800">Kill thread</button>
+            <div class="absolute top-full right-0 z-30 mt-1 w-44 overflow-hidden rounded-xl border border-line bg-surface-2 p-1 shadow-[var(--shadow-pop)]">
+              <button
+                onclick={() => { renameValue = sessionTitle(activeId); renaming = true; menuOpen = false; }}
+                class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+              ><Pencil size={13} /> Rename</button>
+              <button
+                onclick={() => { menuOpen = false; abort(); }}
+                class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+              ><Square size={13} /> Abort run</button>
+              <div class="my-1 h-px bg-line"></div>
+              <button
+                onclick={destroy}
+                class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-red-300 transition-colors hover:bg-red-950/40"
+              ><X size={13} /> Kill thread</button>
             </div>
           {/if}
         </div>
       </div>
 
       <div class="flex flex-1 justify-center overflow-y-auto">
-        <div class="flex w-full max-w-3xl flex-col gap-5 px-6 py-6">
+        <div class="flex w-full max-w-3xl flex-col gap-4 px-6 py-7">
           {#each messages[activeId] ?? [] as m}
             {#if m.role === "user"}
-              <div class="max-w-[80%] self-end rounded-2xl bg-[#1e1e21] px-4 py-2.5 text-[15px] leading-7 whitespace-pre-wrap">{m.text}</div>
+              <div class="max-w-[80%] self-end rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-[14.5px] leading-7 whitespace-pre-wrap">
+                {m.text}
+              </div>
             {:else if m.role === "assistant"}
               <Markdown source={m.text} />
             {:else if m.role === "tool"}
-              <div class="flex items-center gap-2 font-mono text-xs text-zinc-500">
+              <div class="flex items-center gap-2 font-mono text-[11.5px] text-ink-faint">
                 {#if m.phase === "start"}
-                  <Loader2 size={12} class="animate-spin text-zinc-500" />
+                  <Loader2 size={12} class="animate-spin" />
                 {:else if m.isError}
                   <X size={12} class="text-red-400" />
                 {:else}
@@ -586,26 +652,36 @@ onMount(async () => {
                 <span>{m.tool}</span>
               </div>
             {:else if m.role === "bash"}
-              <pre class="overflow-x-auto rounded-lg border border-zinc-800 bg-[#0d0d0f] p-2.5 font-mono text-[11.5px] whitespace-pre-wrap text-zinc-400">{m.text}</pre>
+              <pre class="overflow-x-auto rounded-xl border border-line bg-[#0d0d0f] p-3 font-mono text-[11.5px] whitespace-pre-wrap text-ink-faint">{m.text}</pre>
             {:else if m.role === "work"}
-              <details class="text-sm text-zinc-400">
-                <summary class="flex cursor-pointer list-none items-center gap-1 hover:text-zinc-200">{m.text} <ChevronRight size={14} class="text-zinc-600" /></summary>
-              </details>
+              <div class="flex items-center gap-2 text-[12.5px] text-ink-faint">
+                <Sparkles size={12} />
+                <span>{m.text}</span>
+              </div>
             {:else}
-              <div class="self-center text-xs text-red-300">{m.text}</div>
+              <div class="self-center rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-[12px] text-red-300">{m.text}</div>
             {/if}
           {/each}
+
           {#if draft[activeId]}
             <Markdown source={draft[activeId]} streaming />
           {/if}
+
           {#if (messages[activeId] ?? []).length === 0 && !draft[activeId]}
-            <p class="pt-10 text-center text-[15px] text-zinc-600">Ask pi to read, write, or run anything in this folder.</p>
+            <div class="flex flex-col items-center gap-2 pt-16 text-center">
+              <Sparkles size={18} class="text-ink-faint" />
+              <p class="text-[13.5px] text-ink-faint">
+                Ask pi to read, write, or run anything in this folder.
+              </p>
+            </div>
           {/if}
         </div>
       </div>
 
       <div class="flex justify-center px-6 pb-5">
-        <div class="w-full max-w-3xl rounded-2xl border border-zinc-700/60 bg-[#151517] px-4 pt-3 pb-2.5">
+        <div
+          class="w-full max-w-3xl rounded-2xl border border-line bg-surface-2 p-3 shadow-[var(--shadow-card)] transition-colors focus-within:border-line-strong"
+        >
           <textarea
             bind:this={composerEl}
             rows={1}
@@ -613,58 +689,108 @@ onMount(async () => {
             bind:value={input}
             oninput={autoresize}
             onkeydown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
             }}
-            class="max-h-[200px] w-full resize-none bg-transparent text-[15px] leading-6 outline-none placeholder:text-zinc-600"
+            class="max-h-[220px] w-full resize-none bg-transparent text-[14.5px] leading-6 outline-none placeholder:text-ink-faint"
           ></textarea>
-          <div class="flex items-center justify-between pt-1.5">
-            <button
-              onclick={() => { const s = sessions.find((x) => x.id === activeId); createSession(s?.cwd); }}
-              title="New thread in same folder"
-              class="rounded-full p-1.5 text-xl leading-none text-zinc-300 hover:bg-zinc-700/60"
-            ><Plus size={18} /></button>
+          <div class="flex items-center justify-between pt-2">
+            <div class="flex items-center gap-0.5">
+              <button
+                onclick={() => { const s = sessions.find((x) => x.id === activeId); createSession(s?.cwd); }}
+                title="New thread in same folder"
+                class="grid h-8 w-8 place-items-center rounded-lg text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+              ><Plus size={17} /></button>
+              <button
+                onclick={() => refreshMeta(activeId)}
+                title="Sync model state"
+                class="grid h-8 w-8 place-items-center rounded-lg text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
+              ><Sliders size={15} /></button>
+            </div>
             <div class="flex items-center gap-1.5">
-              {#if streaming[activeId]}<Loader2 size={15} class="mr-1 animate-spin text-zinc-400" />{/if}
+              {#if streaming[activeId]}
+                <Loader2 size={14} class="mr-1 animate-spin text-ink-faint" />
+              {/if}
+
               <div class="relative">
-                <button onclick={() => { modelPickerOpen = !modelPickerOpen; thinkingPickerOpen = false; if (modelPickerOpen) refreshMeta(activeId); }} class="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700/60">
-                  {modelLabel(activeId)} <ChevronDown size={13} class="text-zinc-500" />
+                <button
+                  onclick={() => { modelPickerOpen = !modelPickerOpen; thinkingPickerOpen = false; if (modelPickerOpen) refreshMeta(activeId); }}
+                  class="flex max-w-[220px] items-center gap-1 rounded-lg px-2 py-1.5 text-[12.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+                >
+                  <span class="truncate">{modelLabel(activeId)}</span>
+                  <ChevronDown size={12} class="shrink-0 text-ink-faint" />
                 </button>
                 {#if modelPickerOpen}
-                  <div class="absolute right-0 bottom-full z-30 mb-2 flex max-h-80 w-80 flex-col overflow-hidden rounded-xl border border-zinc-700 bg-[#141416] shadow-xl">
-                    <input placeholder="Search models…" bind:value={modelSearch} class="border-b border-zinc-700 bg-black px-3 py-2 text-sm outline-none" />
+                  <div class="absolute right-0 bottom-full z-30 mb-2 flex max-h-80 w-80 flex-col overflow-hidden rounded-xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]">
+                    <input
+                      placeholder="Search models…"
+                      bind:value={modelSearch}
+                      class="border-b border-line bg-canvas px-3 py-2 text-[13px] outline-none"
+                    />
                     <div class="overflow-y-auto p-1">
-                      {#each groupedModels(activeId) as [provider, list]}
-                        <p class="px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-zinc-500 uppercase">{provider}</p>
+                      {#each MODELS_BY_PROVIDER(filteredModels(activeId)) as [provider, list]}
+                        <p class="px-2.5 pt-2 pb-1 text-[10.5px] font-semibold tracking-wider text-ink-faint uppercase">{provider}</p>
                         {#each list as m}
-                          <button onclick={() => pickModel(m.provider, m.id)} class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800 {currentModel[activeId]?.id === m.id && currentModel[activeId]?.provider === m.provider ? 'bg-zinc-800 ring-1 ring-blue-500' : ''}">
+                          <button
+                            onclick={() => pickModel(m.provider, m.id)}
+                            class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition-colors {currentModel[activeId]?.id === m.id && currentModel[activeId]?.provider === m.provider
+                              ? 'bg-accent-soft text-ink'
+                              : 'text-ink-dim hover:bg-surface-3 hover:text-ink'}"
+                          >
                             <span class="truncate">{m.name ?? m.id}</span>
-                            {#if m.reasoning}<span class="shrink-0 rounded bg-purple-900 px-1.5 py-0.5 text-[10px] text-purple-200">reasoning</span>{/if}
+                            {#if m.reasoning}
+                              <span class="shrink-0 rounded-md border border-line bg-surface-3 px-1.5 py-0.5 text-[10px] text-ink-faint">reasoning</span>
+                            {/if}
                           </button>
                         {/each}
                       {/each}
                       {#if filteredModels(activeId).length === 0}
-                        <p class="p-3 text-sm text-zinc-500">{(models[activeId] ?? []).length === 0 ? "Waiting on pi…" : "No matches."}</p>
+                        <p class="px-3 py-3 text-[13px] text-ink-faint">
+                          {(models[activeId] ?? []).length === 0 ? "Waiting on pi…" : "No matches."}
+                        </p>
                       {/if}
                     </div>
                   </div>
                 {/if}
               </div>
+
               <div class="relative">
-                <button onclick={() => { thinkingPickerOpen = !thinkingPickerOpen; modelPickerOpen = false; }} class="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700/60">
-                  {(thinkingLevel[activeId] ?? "").charAt(0).toUpperCase() + (thinkingLevel[activeId] ?? "").slice(1) || "Level"} <ChevronDown size={13} class="text-zinc-500" />
+                <button
+                  onclick={() => { thinkingPickerOpen = !thinkingPickerOpen; modelPickerOpen = false; }}
+                  class="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[12.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+                >
+                  <span class="capitalize">{thinkingLevel[activeId] ?? "Level"}</span>
+                  <ChevronDown size={12} class="text-ink-faint" />
                 </button>
                 {#if thinkingPickerOpen}
-                  <div class="absolute right-0 bottom-full z-30 mb-2 w-36 overflow-hidden rounded-xl border border-zinc-700 bg-[#141416] p-1 shadow-xl">
+                  <div class="absolute right-0 bottom-full z-30 mb-2 w-36 overflow-hidden rounded-xl border border-line bg-surface-2 p-1 shadow-[var(--shadow-pop)]">
                     {#each thinkingLevels[activeId].length ? thinkingLevels[activeId] : ["off", "minimal", "low", "medium", "high"] as lv}
-                      <button onclick={() => pickThinking(lv)} class="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize hover:bg-zinc-800 {thinkingLevel[activeId] === lv ? 'bg-zinc-800 ring-1 ring-blue-500' : ''}">{lv}</button>
+                      <button
+                        onclick={() => pickThinking(lv)}
+                        class="block w-full rounded-lg px-2.5 py-1.5 text-left text-[13px] capitalize transition-colors {thinkingLevel[activeId] === lv
+                          ? 'bg-accent-soft text-ink'
+                          : 'text-ink-dim hover:bg-surface-3 hover:text-ink'}"
+                      >{lv}</button>
                     {/each}
                   </div>
                 {/if}
               </div>
+
               {#if streaming[activeId]}
-                <button onclick={abort} title="Stop" class="rounded-full bg-zinc-100 p-2.5 text-black hover:bg-white"><Square size={13} fill="currentColor" /></button>
+                <button
+                  onclick={abort}
+                  title="Stop"
+                  class="grid h-8 w-8 place-items-center rounded-xl bg-ink text-black transition-colors hover:bg-white"
+                ><Square size={12} fill="currentColor" /></button>
               {:else}
-                <button onclick={send} disabled={!input.trim()} title="Send" class="rounded-full bg-zinc-700/60 p-2.5 text-zinc-200 hover:bg-zinc-600 disabled:opacity-40"><Send size={15} /></button>
+                <button
+                  onclick={send}
+                  disabled={!input.trim()}
+                  title="Send"
+                  class="grid h-8 w-8 place-items-center rounded-xl bg-ink text-black transition-all hover:bg-white disabled:bg-surface-3 disabled:text-ink-faint"
+                ><Send size={14} /></button>
               {/if}
             </div>
           </div>
@@ -675,20 +801,38 @@ onMount(async () => {
 </div>
 
 {#if settingsOpen}
-  <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60">
-    <div class="w-96 rounded-2xl border border-zinc-700 bg-[#141416] p-5">
-      <h3 class="mb-3 text-lg font-medium">Settings</h3>
+  <div class="fixed inset-0 z-40 grid place-items-center bg-black/60 p-6">
+    <div class="w-[420px] rounded-2xl border border-line bg-surface-2 p-5 shadow-[var(--shadow-pop)]">
+      <div class="mb-4 flex items-center gap-2.5">
+        <Settings size={17} class="text-ink-dim" />
+        <h3 class="text-[15px] font-medium">Settings</h3>
+      </div>
       {#if appInfo}
-        <dl class="flex flex-col gap-2 text-sm">
-          <div class="flex justify-between gap-3"><dt class="text-zinc-500">pi binary</dt><dd class="truncate font-mono text-xs">{appInfo.pi_bin}</dd></div>
-          <div class="flex justify-between gap-3"><dt class="text-zinc-500">pi version</dt><dd class="font-mono text-xs">{appInfo.pi_version}</dd></div>
-          <div class="flex justify-between gap-3"><dt class="text-zinc-500">sessions dir</dt><dd class="truncate font-mono text-xs">{appInfo.session_root}</dd></div>
-          <div class="flex justify-between gap-3"><dt class="text-zinc-500">live sessions</dt><dd class="font-mono text-xs">{appInfo.sessions}</dd></div>
+        <dl class="flex flex-col gap-2.5 text-[13px]">
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-ink-faint">pi binary</dt>
+            <dd class="truncate font-mono text-[11.5px] text-ink-dim">{appInfo.pi_bin}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-ink-faint">pi version</dt>
+            <dd class="font-mono text-[11.5px] text-ink-dim">{appInfo.pi_version}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-ink-faint">sessions dir</dt>
+            <dd class="truncate font-mono text-[11.5px] text-ink-dim">{appInfo.session_root}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-ink-faint">live sessions</dt>
+            <dd class="font-mono text-[11.5px] text-ink-dim">{appInfo.sessions}</dd>
+          </div>
         </dl>
       {:else}
-        <p class="text-sm text-zinc-500">Loading…</p>
+        <p class="text-[13px] text-ink-faint">Loading…</p>
       {/if}
-      <button onclick={() => (settingsOpen = false)} class="mt-4 w-full rounded-lg bg-zinc-100 py-2 text-sm font-medium text-black hover:bg-white">Close</button>
+      <button
+        onclick={() => (settingsOpen = false)}
+        class="mt-5 w-full rounded-xl bg-ink py-2 text-[13px] font-medium text-black transition-colors hover:bg-white"
+      >Close</button>
     </div>
   </div>
 {/if}

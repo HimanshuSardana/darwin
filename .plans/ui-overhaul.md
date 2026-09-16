@@ -35,9 +35,9 @@ Working rules:
 - [x] Commit: `refactor(ui): replace emoji glyphs with lucide icons`
 
 ## Step 5 — Visual redesign (modern, clean)
-- [ ] Design tokens: surfaces, border, text hierarchy, accent, radius, shadow
-- [ ] Refine sidebar, thread header, composer, empty state
-- [ ] Commit: `style(ui): modern visual system with tokens and layered surfaces`
+- [x] Design tokens: surfaces, border, text hierarchy, accent, radius, shadow
+- [x] Refine sidebar, thread header, composer, empty state
+- [x] Commit: `style(ui): modern visual system with tokens and layered surfaces`
 
 ## Step 6 — Animation / motion
 - [ ] Add `svelte/transition` + `svelte/animate` flip for lists
