@@ -12,11 +12,74 @@ let input = $state("");
 let cwdInput = $state("");
 let error = $state("");
 let streaming = $state({}); // sessionId -> bool
+let models = $state({}); // sessionId -> [{id, name, provider, ...}]
+let currentModel = $state({}); // sessionId -> {id, name, provider} | null
+let pickerOpen = $state(false);
+let modelSearch = $state("");
+let modelsLoading = $state({}); // sessionId -> bool
 
 function ensureSession(id) {
   if (!rawEvents[id]) rawEvents[id] = [];
   if (!messages[id]) messages[id] = [];
   if (!draft[id]) draft[id] = "";
+  if (!models[id]) models[id] = [];
+  if (!(id in currentModel)) currentModel[id] = null;
+}
+
+function modelLabel(id) {
+  const m = currentModel[id];
+  if (!m) return "select model";
+  return `${m.provider}/${m.name ?? m.id}`;
+}
+
+function filteredModels(id) {
+  const q = modelSearch.trim().toLowerCase();
+  const list = models[id] ?? [];
+  if (!q) return list;
+  return list.filter((m) =>
+    `${m.provider} ${m.name ?? ""} ${m.id}`.toLowerCase().includes(q),
+  );
+}
+
+function groupedModels(id) {
+  const groups = {};
+  for (const m of filteredModels(id)) {
+    const p = m.provider ?? "other";
+    if (!groups[p]) groups[p] = [];
+    groups[p].push(m);
+  }
+  return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+}
+
+async function refreshModels(id) {
+  modelsLoading[id] = true;
+  try {
+    await invoke("request_state", { sessionId: id });
+    await invoke("request_models", { sessionId: id });
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function pickModel(provider, modelId) {
+  if (!activeId) return;
+  error = "";
+  try {
+    await invoke("set_model", { sessionId: activeId, provider, modelId });
+    pickerOpen = false;
+    modelSearch = "";
+  } catch (e) {
+    error = String(e);
+  }
+}
+
+async function cycleModelClick() {
+  if (!activeId) return;
+  try {
+    await invoke("cycle_model", { sessionId: activeId });
+  } catch (e) {
+    error = String(e);
+  }
 }
 
 function applyEvent(sessionId, ev) {
@@ -59,6 +122,19 @@ function applyEvent(sessionId, ev) {
   if (t === "bash_execution_update" && ev.output) {
     messages[sessionId].push({ role: "tool", text: "$ " + String(ev.output).slice(0, 500) });
   }
+  if (t === "response" && ev.command === "get_available_models" && ev.success) {
+    models[sessionId] = ev.data?.models ?? [];
+    modelsLoading[sessionId] = false;
+  }
+  if (t === "response" && ev.command === "get_state" && ev.success) {
+    currentModel[sessionId] = ev.data?.model ?? null;
+  }
+  if (t === "response" && ev.command === "set_model" && ev.success) {
+    currentModel[sessionId] = ev.data ?? null;
+  }
+  if (t === "response" && ev.command === "cycle_model" && ev.success) {
+    if (ev.data?.model) currentModel[sessionId] = ev.data.model;
+  }
   if (t === "response" && ev.success === false) {
     messages[sessionId].push({ role: "system", text: "RPC error: " + JSON.stringify(ev) });
   }
@@ -84,6 +160,7 @@ async function createSession() {
     await refreshSessions();
     activeId = id;
     ensureSession(id);
+    refreshModels(id);
   } catch (e) {
     error = String(e);
   }
@@ -97,6 +174,8 @@ async function selectSession(id) {
     const after = rawEvents[id].length;
     const evs = await invoke("get_events", { sessionId: id, after });
     for (const ev of evs) applyEvent(id, ev);
+    // re-query model state in case the child restarted or state changed
+    if (currentModel[id] === null && (models[id] ?? []).length === 0) refreshModels(id);
   } catch (e) {
     error = String(e);
   }
@@ -135,6 +214,9 @@ async function destroy() {
     await invoke("destroy_session", { sessionId: id });
     delete rawEvents[id];
     delete messages[id];
+    delete models[id];
+    delete currentModel[id];
+    pickerOpen = false;
     activeId = null;
     await refreshSessions();
   } catch (e) {
@@ -187,6 +269,48 @@ onMount(async () => {
     {#if !activeId}
       <p class="p-4 text-sm opacity-60">Create or pick a session to chat with pi.</p>
     {:else}
+      <div class="relative flex items-center gap-2 border-b border-zinc-800 px-4 py-2">
+        <button
+          onclick={() => { pickerOpen = !pickerOpen; if (pickerOpen) refreshModels(activeId); }}
+          class="flex max-w-md items-center gap-2 truncate rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs hover:bg-zinc-800"
+          title="Pick model"
+        >
+          <span class="truncate font-mono">{modelLabel(activeId)}</span>
+          <span class="opacity-60">▾</span>
+        </button>
+        <button
+          onclick={cycleModelClick}
+          title="Cycle to next model"
+          class="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs hover:bg-zinc-800"
+        >⇄</button>
+        {#if modelsLoading[activeId]}<span class="text-xs opacity-50">loading…</span>{/if}
+        {#if pickerOpen}
+          <div class="absolute top-full left-2 z-20 mt-1 flex max-h-96 w-96 flex-col overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl">
+            <input
+              placeholder="Search models…"
+              bind:value={modelSearch}
+              class="border-b border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            />
+            <div class="overflow-y-auto p-1">
+              {#each groupedModels(activeId) as [provider, list]}
+                <p class="px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-zinc-400 uppercase">{provider}</p>
+                {#each list as m}
+                  <button
+                    onclick={() => pickModel(m.provider, m.id)}
+                    class="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800 {currentModel[activeId]?.id === m.id && currentModel[activeId]?.provider === m.provider ? 'bg-zinc-800 ring-1 ring-blue-500' : ''}"
+                  >
+                    <span class="truncate">{m.name ?? m.id}</span>
+                    {#if m.reasoning}<span class="shrink-0 rounded bg-purple-900 px-1.5 py-0.5 text-[10px] text-purple-200">reasoning</span>{/if}
+                  </button>
+                {/each}
+              {/each}
+              {#if filteredModels(activeId).length === 0}
+                <p class="p-3 text-sm opacity-60">{(models[activeId] ?? []).length === 0 ? "No models loaded yet — waiting on pi…" : "No matches."}</p>
+              {/if}
+            </div>
+          </div>
+        {/if}
+      </div>
       <div class="flex flex-1 flex-col gap-2 overflow-y-auto p-4">
         {#each messages[activeId] ?? [] as m}
           {#if m.role === 'user'}
