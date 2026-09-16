@@ -58,9 +58,9 @@ Working rules:
 - [x] Commit: `feat(ui): structured tool activity timeline`
 
 ## Step 9 — Command palette + settings
-- [ ] `Cmd/Ctrl+K` palette for thread search/navigation
-- [ ] Settings modal polish
-- [ ] Commit: `feat(ui): command palette and settings polish`
+- [x] `Cmd/Ctrl+K` palette for thread search/navigation
+- [x] Settings modal polish
+- [x] Commit: `feat(ui): command palette and settings polish`
 
 ## Step 10 — Final verification
 - [ ] `bun run build` green

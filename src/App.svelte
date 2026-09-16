@@ -7,6 +7,7 @@ import { fade, fly, scale, slide } from "svelte/transition";
 import { flip } from "svelte/animate";
 import Markdown from "./lib/Markdown.svelte";
 import ToolActivity from "./lib/ToolActivity.svelte";
+import CommandPalette from "./lib/CommandPalette.svelte";
 import ArrowLeft from "lucide-svelte/icons/arrow-left";
 import ArrowRight from "lucide-svelte/icons/arrow-right";
 import ChevronDown from "lucide-svelte/icons/chevron-down";
@@ -67,6 +68,7 @@ let menuOpen = $state(false);
 let renaming = $state(false);
 let renameValue = $state("");
 let settingsOpen = $state(false);
+let commandOpen = $state(false);
 let appInfo = $state(null);
 
 let composerEl = $state(null);
@@ -479,12 +481,45 @@ async function pickThinking(level) {
 }
 
 async function openSettings() {
+  commandOpen = false;
   try {
     appInfo = await invoke("app_info");
   } catch (e) {
     error = String(e);
   }
   settingsOpen = true;
+}
+
+function paletteThreads() {
+  return sessions.map((s) => ({
+    id: s.id,
+    title: sessionTitle(s.id),
+    project: projectOf(s),
+    alive: s.alive,
+  }));
+}
+
+function newThread() {
+  commandOpen = false;
+  createSession(null);
+}
+
+function onGlobalKeydown(e) {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    commandOpen = !commandOpen;
+    return;
+  }
+  if (mod && e.key.toLowerCase() === "b") {
+    e.preventDefault();
+    sidebarHidden = !sidebarHidden;
+    return;
+  }
+  if (mod && e.key.toLowerCase() === "n") {
+    e.preventDefault();
+    createSession(null);
+  }
 }
 
 const winMin = () => appWindow.minimize();
@@ -494,10 +529,12 @@ const winClose = () => appWindow.close();
 onMount(async () => {
   await refreshSessions();
   if (activeId) refreshMeta(activeId);
+  window.addEventListener("keydown", onGlobalKeydown);
   await listen("pi-event", (e) => {
     const { session_id, event } = e.payload;
     applyEvent(session_id, event);
   });
+  return () => window.removeEventListener("keydown", onGlobalKeydown);
 });
 </script>
 
@@ -639,6 +676,13 @@ onMount(async () => {
           onclick={openSettings}
           class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
         ><Settings size={16} class="text-ink-faint" /> Settings</button>
+        <button
+          onclick={() => (commandOpen = true)}
+          class="mt-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+        >
+          <Search size={16} class="text-ink-faint" /> Search
+          <kbd class="ml-auto rounded-md border border-line bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">⌘K</kbd>
+        </button>
       </div>
     </aside>
   {/if}
@@ -906,41 +950,77 @@ onMount(async () => {
   <div
     transition:fade={{ duration: dur(160) }}
     class="fixed inset-0 z-40 grid place-items-center bg-black/60 p-6"
+    onclick={() => (settingsOpen = false)}
+    role="presentation"
   >
     <div
       transition:scale={{ start: 0.97, duration: dur(180) }}
-      class="w-[420px] rounded-2xl border border-line bg-surface-2 p-5 shadow-[var(--shadow-pop)]"
+      onclick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      class="w-[460px] overflow-hidden rounded-2xl border border-line bg-surface-2 shadow-[var(--shadow-pop)]"
     >
-      <div class="mb-4 flex items-center gap-2.5">
-        <Settings size={17} class="text-ink-dim" />
-        <h3 class="text-[15px] font-medium">Settings</h3>
+      <div class="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
+        <Settings size={16} class="text-ink-dim" />
+        <h3 class="text-[14.5px] font-medium">Settings</h3>
       </div>
-      {#if appInfo}
-        <dl class="flex flex-col gap-2.5 text-[13px]">
-          <div class="flex items-center justify-between gap-3">
-            <dt class="text-ink-faint">pi binary</dt>
-            <dd class="truncate font-mono text-[11.5px] text-ink-dim">{appInfo.pi_bin}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <dt class="text-ink-faint">pi version</dt>
-            <dd class="font-mono text-[11.5px] text-ink-dim">{appInfo.pi_version}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <dt class="text-ink-faint">sessions dir</dt>
-            <dd class="truncate font-mono text-[11.5px] text-ink-dim">{appInfo.session_root}</dd>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <dt class="text-ink-faint">live sessions</dt>
-            <dd class="font-mono text-[11.5px] text-ink-dim">{appInfo.sessions}</dd>
-          </div>
-        </dl>
-      {:else}
-        <p class="text-[13px] text-ink-faint">Loading…</p>
-      {/if}
-      <button
-        onclick={() => (settingsOpen = false)}
-        class="mt-5 w-full rounded-xl bg-ink py-2 text-[13px] font-medium text-black transition-colors hover:bg-white"
-      >Close</button>
+
+      <div class="flex flex-col gap-4 px-5 py-4">
+        {#if appInfo}
+          <section class="flex flex-col gap-2">
+            <h4 class="text-[11px] font-semibold tracking-wider text-ink-faint uppercase">Runtime</h4>
+            <dl class="flex flex-col gap-2 text-[13px]">
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-ink-faint">pi binary</dt>
+                <dd class="truncate font-mono text-[11.5px] text-ink-dim">{appInfo.pi_bin}</dd>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-ink-faint">pi version</dt>
+                <dd class="font-mono text-[11.5px] text-ink-dim">{appInfo.pi_version}</dd>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-ink-faint">live sessions</dt>
+                <dd class="font-mono text-[11.5px] text-ink-dim">{appInfo.sessions}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="flex flex-col gap-2">
+            <h4 class="text-[11px] font-semibold tracking-wider text-ink-faint uppercase">Storage</h4>
+            <p class="font-mono text-[11.5px] break-all text-ink-dim">{appInfo.session_root}</p>
+          </section>
+        {:else}
+          <p class="text-[13px] text-ink-faint">Loading…</p>
+        {/if}
+
+        <section class="flex flex-col gap-2">
+          <h4 class="text-[11px] font-semibold tracking-wider text-ink-faint uppercase">Shortcuts</h4>
+          <dl class="flex flex-col gap-1.5 text-[12.5px]">
+            {#each [["⌘/Ctrl + K", "Command palette"], ["⌘/Ctrl + N", "New thread"], ["⌘/Ctrl + B", "Toggle sidebar"], ["Enter", "Send message"], ["Shift + Enter", "Newline"], ["Esc", "Close overlays"]] as [key, label]}
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-ink-dim">{label}</dt>
+                <dd><kbd class="rounded-md border border-line bg-surface-3 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-faint">{key}</kbd></dd>
+              </div>
+            {/each}
+          </dl>
+        </section>
+      </div>
+
+      <div class="border-t border-line p-3">
+        <button
+          onclick={() => (settingsOpen = false)}
+          class="w-full rounded-xl bg-ink py-2 text-[13px] font-medium text-black transition-colors hover:bg-white"
+        >Close</button>
+      </div>
     </div>
   </div>
 {/if}
+
+<CommandPalette
+  open={commandOpen}
+  threads={paletteThreads()}
+  onSelect={(id) => selectSession(id)}
+  onNew={newThread}
+  onSettings={openSettings}
+  onClose={() => (commandOpen = false)}
+/>
