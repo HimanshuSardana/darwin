@@ -52,10 +52,10 @@ Working rules:
 - [x] Commit: `feat(ui): live markdown streaming and smart autoscroll`
 
 ## Step 8 — Tool call rendering
-- [ ] Group consecutive tool events into collapsible activity blocks
-- [ ] Tool name + icon, status, elapsed
-- [ ] Bash output in code block, truncate with show more
-- [ ] Commit: `feat(ui): structured tool activity timeline`
+- [x] Group consecutive tool events into collapsible activity blocks
+- [x] Tool name + icon, status, elapsed
+- [x] Bash output in code block, truncate with show more
+- [x] Commit: `feat(ui): structured tool activity timeline`
 
 ## Step 9 — Command palette + settings
 - [ ] `Cmd/Ctrl+K` palette for thread search/navigation

@@ -6,9 +6,9 @@ import { onMount } from "svelte";
 import { fade, fly, scale, slide } from "svelte/transition";
 import { flip } from "svelte/animate";
 import Markdown from "./lib/Markdown.svelte";
+import ToolActivity from "./lib/ToolActivity.svelte";
 import ArrowLeft from "lucide-svelte/icons/arrow-left";
 import ArrowRight from "lucide-svelte/icons/arrow-right";
-import Check from "lucide-svelte/icons/check";
 import ChevronDown from "lucide-svelte/icons/chevron-down";
 import Folder from "lucide-svelte/icons/folder";
 import FolderOpen from "lucide-svelte/icons/folder-open";
@@ -132,6 +132,50 @@ function groupedSessions() {
     groups.get(p).push(s);
   }
   return [...groups.entries()];
+}
+
+/**
+ * Fold raw thread items into render blocks. Consecutive tool/bash rows collapse
+ * into one activity block so a long run reads as a single unit with a summary.
+ */
+function blocks(id) {
+  const list = messages[id] ?? [];
+  const out = [];
+  let activity = null;
+  const flush = () => {
+    if (activity) out.push(activity);
+    activity = null;
+  };
+  for (const m of list) {
+    if (m.role === "tool" || m.role === "bash") {
+      activity ??= { kind: "activity", items: [] };
+      const items = activity.items;
+      if (m.role === "bash") {
+        const last = items[items.length - 1];
+        if (last && last.name === "bash") last.output = m.text;
+        else items.push({ name: "bash", status: "done", output: m.text });
+      } else {
+        const last = items[items.length - 1];
+        if (last && last.name === m.tool && last.status === "running" && m.phase === "end") {
+          last.status = m.isError ? "error" : "done";
+        } else {
+          items.push({
+            name: m.tool,
+            status: m.phase === "start" ? "running" : m.isError ? "error" : "done",
+          });
+        }
+      }
+      continue;
+    }
+    flush();
+    out.push({ kind: "message", msg: m });
+  }
+  flush();
+  return out;
+}
+
+function activityRunning(items) {
+  return items.some((i) => i.status === "running");
 }
 
 function modelLabel(id) {
@@ -680,35 +724,27 @@ onMount(async () => {
         class="relative flex flex-1 justify-center overflow-y-auto"
       >
         <div class="flex w-full max-w-3xl flex-col gap-4 px-6 py-7">
-          {#each messages[activeId] ?? [] as m}
-            {#if m.role === "user"}
+          {#each blocks(activeId) as b, bi (bi)}
+            {#if b.kind === "activity"}
+              <ToolActivity
+                items={b.items}
+                running={activityRunning(b.items)}
+              />
+            {:else if b.msg.role === "user"}
               <div in:fly={{ y: 8, duration: dur(200) }} class="max-w-[80%] self-end rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-[14.5px] leading-7 whitespace-pre-wrap">
-                {m.text}
+                {b.msg.text}
               </div>
-            {:else if m.role === "assistant"}
+            {:else if b.msg.role === "assistant"}
               <div in:fly={{ y: 8, duration: dur(200) }}>
-                <Markdown source={m.text} />
+                <Markdown source={b.msg.text} />
               </div>
-            {:else if m.role === "tool"}
-              <div in:fade={{ duration: dur(150) }} class="flex items-center gap-2 font-mono text-[11.5px] text-ink-faint">
-                {#if m.phase === "start"}
-                  <Loader2 size={12} class="animate-spin" />
-                {:else if m.isError}
-                  <X size={12} class="text-red-400" />
-                {:else}
-                  <Check size={12} class="text-emerald-400" />
-                {/if}
-                <span>{m.tool}</span>
-              </div>
-            {:else if m.role === "bash"}
-              <pre in:fade={{ duration: dur(150) }} class="overflow-x-auto rounded-xl border border-line bg-[#0d0d0f] p-3 font-mono text-[11.5px] whitespace-pre-wrap text-ink-faint">{m.text}</pre>
-            {:else if m.role === "work"}
+            {:else if b.msg.role === "work"}
               <div in:fade={{ duration: dur(200) }} class="flex items-center gap-2 text-[12.5px] text-ink-faint">
                 <Sparkles size={12} />
-                <span>{m.text}</span>
+                <span>{b.msg.text}</span>
               </div>
             {:else}
-              <div in:fly={{ y: 6, duration: dur(180) }} class="self-center rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-[12px] text-red-300">{m.text}</div>
+              <div in:fly={{ y: 6, duration: dur(180) }} class="self-center rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-1.5 text-[12px] text-red-300">{b.msg.text}</div>
             {/if}
           {/each}
 
