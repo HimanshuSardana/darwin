@@ -16,6 +16,40 @@ const STATUS_ICON: Record<PlanTodo["status"], typeof CircleIcon> = {
   completed: CheckCircle2Icon,
 };
 
+/** Pull a plan out of an update_plan tool call (result preferred, input fallback). */
+export function parsePlanTodos(
+  input: unknown,
+  output: unknown,
+): { readonly summary: string | null; readonly todos: PlanTodo[] } | null {
+  const data = (output ?? input) as {
+    readonly summary?: unknown;
+    readonly todos?: unknown;
+  } | null;
+  if (!data || !Array.isArray(data.todos)) return null;
+  const todos = data.todos.filter(
+    (todo): todo is PlanTodo =>
+      typeof todo === "object" &&
+      todo !== null &&
+      typeof (todo as PlanTodo).title === "string" &&
+      ((todo as PlanTodo).status === "pending" ||
+        (todo as PlanTodo).status === "in_progress" ||
+        (todo as PlanTodo).status === "completed"),
+  );
+  if (todos.length === 0) return null;
+  return {
+    summary: typeof data.summary === "string" ? data.summary : null,
+    todos: todos.map((todo) => ({
+      id: String((todo as { id?: unknown }).id ?? todo.title),
+      notes:
+        typeof (todo as { notes?: unknown }).notes === "string"
+          ? (todo as { notes: string }).notes
+          : undefined,
+      status: todo.status,
+      title: todo.title,
+    })),
+  };
+}
+
 /** Rendered for update_plan tool calls: the model's published task plan. */
 export function PlanTodos({
   summary,

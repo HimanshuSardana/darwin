@@ -39,7 +39,7 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
-import { PlanTodos, type PlanTodo } from "@/components/plan-todos";
+import { PlanTodos, parsePlanTodos } from "@/components/plan-todos";
 import { cn } from "@/lib/utils";
 
 export type AgentInputResponse = {
@@ -176,36 +176,9 @@ function PlanTodosBlock({
   readonly input: unknown;
   readonly output: unknown;
 }) {
-  const data = (output ?? input) as {
-    readonly summary?: unknown;
-    readonly todos?: unknown;
-  } | null;
-  const todos = Array.isArray(data?.todos)
-    ? data.todos.filter(
-        (todo): todo is PlanTodo =>
-          typeof todo === "object" &&
-          todo !== null &&
-          typeof (todo as PlanTodo).title === "string" &&
-          ((todo as PlanTodo).status === "pending" ||
-            (todo as PlanTodo).status === "in_progress" ||
-            (todo as PlanTodo).status === "completed"),
-      )
-    : [];
-  if (todos.length === 0) return null;
-  return (
-    <PlanTodos
-      summary={typeof data?.summary === "string" ? data.summary : null}
-      todos={todos.map((todo) => ({
-        id: String((todo as { id?: unknown }).id ?? todo.title),
-        notes:
-          typeof (todo as { notes?: unknown }).notes === "string"
-            ? (todo as { notes: string }).notes
-            : undefined,
-        status: todo.status,
-        title: todo.title,
-      }))}
-    />
-  );
+  const plan = parsePlanTodos(input, output);
+  if (!plan) return null;
+  return <PlanTodos summary={plan.summary} todos={plan.todos} />;
 }
 
 function QuestionRequest({
