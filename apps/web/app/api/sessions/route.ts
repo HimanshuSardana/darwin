@@ -30,6 +30,11 @@ export async function POST(request: Request) {
   if (!body || typeof body.sessionId !== "string" || body.sessionId.length === 0) {
     return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
   }
-  const owner = await claimSession(body.sessionId, userId);
-  return NextResponse.json({ sessionId: body.sessionId, owner, mine: owner === userId });
+  let mine = false;
+  try {
+    mine = (await claimSession(body.sessionId, userId)) === userId;
+  } catch {
+    return NextResponse.json({ error: "invalid sessionId" }, { status: 400 });
+  }
+  return NextResponse.json({ sessionId: body.sessionId, mine });
 }

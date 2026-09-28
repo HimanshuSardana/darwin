@@ -33,8 +33,14 @@ async function save(registry: Registry): Promise<void> {
   await writeFile(path, JSON.stringify(registry, null, 2), "utf8");
 }
 
+/** Session IDs are opaque Eve handles; reject anything else outright. */
+function validSessionId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{8,128}$/.test(value);
+}
+
 /** First writer wins: whoever registers a session first owns it. */
 export async function claimSession(sessionId: string, userId: string): Promise<string> {
+  if (!validSessionId(sessionId)) throw new Error("invalid session id");
   const registry = await load();
   const existing = registry[sessionId];
   if (existing) return existing.userId;

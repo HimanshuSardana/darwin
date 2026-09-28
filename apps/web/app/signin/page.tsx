@@ -7,6 +7,12 @@ import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+/** Reject open redirects: only same-origin paths are allowed. */
+function safeNext(raw: string | null): string {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return "/";
+}
+
 export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -28,7 +34,7 @@ export default function SignInPage() {
       setError(signInError.message ?? "Could not sign in.");
       return;
     }
-    router.push(searchParams.get("next") ?? "/");
+    router.push(safeNext(searchParams.get("next")));
     router.refresh();
   };
 

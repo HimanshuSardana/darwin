@@ -84,7 +84,11 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const id = crypto.randomUUID().slice(0, 8);
+  const existing = await loadAll();
+  let id = crypto.randomUUID();
+  while (existing.some((entry) => entry.id === id)) {
+    id = crypto.randomUUID();
+  }
   let path: string | null = null;
   if (provider === "host") {
     path = join(workspaceRoot(), id);
@@ -99,7 +103,7 @@ export async function POST(request: Request) {
     path,
     createdAt: Date.now(),
   };
-  const all = await loadAll();
+  const all = existing;
   all.push(record);
   await saveAll(all);
   return NextResponse.json({ workspace: record }, { status: 201 });
