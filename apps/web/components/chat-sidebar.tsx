@@ -1,14 +1,22 @@
 "use client";
 
 import { MessageSquareTextIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import type { ChatSessionEntry } from "@/lib/sessions";
 
 function relativeTime(timestamp: number): string {
@@ -37,77 +45,72 @@ export function ChatSidebar({
   readonly sessions: readonly ChatSessionEntry[];
 }) {
   return (
-    <div className="flex h-full w-full flex-col bg-muted/40">
-      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-        <span className="px-1 font-medium text-sm tracking-tight">Chats</span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button aria-label="Start a new chat" onClick={onNew} size="icon-sm" variant="ghost">
-              <PlusIcon className="size-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">New chat</TooltipContent>
-        </Tooltip>
-      </div>
-      <Separator />
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {sessions.length === 0 ? (
-          <p className="px-2 py-6 text-center text-muted-foreground text-xs leading-relaxed">
-            No conversations yet.
-            <br />
-            Start one with the composer.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-0.5">
-            {sessions.map((session) => {
-              const isActive = session.sessionId === activeId;
-              return (
-                <li key={session.sessionId} className="group relative">
-                  <Button
-                    className={cn(
-                      "h-auto w-full justify-start gap-2 py-2 pr-8 pl-2.5 text-left",
-                      !isActive && "text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => onSelect(session.sessionId)}
-                    variant={isActive ? "secondary" : "ghost"}
-                  >
-                    <MessageSquareTextIcon className="size-4 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-normal text-sm">
-                        {session.title}
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <div className="flex items-center gap-1">
+          <SidebarTrigger />
+          <span className="flex-1 truncate px-1 font-medium text-sm tracking-tight group-data-[collapsible=icon]:hidden">
+            Chats
+          </span>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+          <SidebarGroupAction onClick={onNew} title="New chat">
+            <PlusIcon />
+            <span className="sr-only">New chat</span>
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            {sessions.length === 0 ? (
+              <p className="px-2 py-6 text-center text-muted-foreground text-xs leading-relaxed group-data-[collapsible=icon]:hidden">
+                No conversations yet.
+                <br />
+                Start one with the composer.
+              </p>
+            ) : (
+              <SidebarMenu>
+                {sessions.map((session) => (
+                  <SidebarMenuItem key={session.sessionId}>
+                    <SidebarMenuButton
+                      isActive={session.sessionId === activeId}
+                      onClick={() => onSelect(session.sessionId)}
+                      tooltip={session.title}
+                    >
+                      <MessageSquareTextIcon />
+                      <span>
+                        <span className="block truncate font-normal">
+                          {session.title}
+                        </span>
+                        <span className="text-muted-foreground block text-[11px]">
+                          {relativeTime(session.updatedAt)}
+                        </span>
                       </span>
-                      <span className="block text-muted-foreground text-[11px]">
-                        {relativeTime(session.updatedAt)}
-                      </span>
-                    </span>
-                  </Button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        aria-label={`Delete "${session.title}"`}
-                        className="absolute top-1/2 right-1 size-7 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDelete(session.sessionId);
-                        }}
-                        size="icon-sm"
-                        variant="ghost"
-                      >
-                        <Trash2Icon className="size-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">Remove from list</TooltipContent>
-                  </Tooltip>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-      <Separator />
-      <p className="px-4 py-2.5 text-muted-foreground text-[11px]">
-        Conversations persist on the agent; the list lives in this browser.
-      </p>
-    </div>
+                    </SidebarMenuButton>
+                    <SidebarMenuAction
+                      aria-label={`Remove "${session.title}" from list`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete(session.sessionId);
+                      }}
+                      showOnHover
+                      title="Remove from list"
+                    >
+                      <Trash2Icon />
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <p className="text-muted-foreground px-2 py-1 text-[11px] group-data-[collapsible=icon]:hidden">
+          Conversations persist on the agent; the list lives in this browser.
+        </p>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }

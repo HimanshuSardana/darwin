@@ -2,12 +2,11 @@
 
 import { BrainIcon } from "lucide-react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  PromptInputSelect,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectTrigger,
+} from "@/components/ai-elements/prompt-input";
 import {
   Tooltip,
   TooltipContent,
@@ -20,6 +19,12 @@ import {
   type ReasoningEffort,
 } from "@/lib/reasoning";
 
+/**
+ * Reasoning effort picker modeled on the AI Elements model selector
+ * (PromptInputSelect + Trigger + Content + Item), with a compact trigger
+ * label — SelectValue would mirror the selected item's full content,
+ * including its description.
+ */
 export function ReasoningSelect({
   onChange,
   value,
@@ -28,34 +33,34 @@ export function ReasoningSelect({
   readonly value: ReasoningEffort;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Select
-          onValueChange={(next) => onChange(next as ReasoningEffort)}
-          value={value}
-        >
-          <SelectTrigger
+    <PromptInputSelect
+      onValueChange={(next) => onChange(next as ReasoningEffort)}
+      value={value}
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PromptInputSelectTrigger
             aria-label="Reasoning effort"
-            className="h-8 w-auto gap-1.5 border-transparent bg-transparent px-2 text-muted-foreground text-xs shadow-none hover:bg-muted hover:text-foreground"
+            className="h-8 gap-1.5 px-2 text-xs"
           >
             <BrainIcon className="size-3.5" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="start">
-            {REASONING_EFFORTS.map((effort) => (
-              <SelectItem key={effort} value={effort}>
-                <span className="flex flex-col items-start gap-0.5">
-                  <span className="text-xs">{REASONING_LABELS[effort]}</span>
-                  <span className="text-muted-foreground text-[11px]">
-                    {REASONING_DESCRIPTIONS[effort]}
-                  </span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </TooltipTrigger>
-      <TooltipContent side="top">Reasoning effort for this turn</TooltipContent>
-    </Tooltip>
+            <span className="font-normal">{REASONING_LABELS[value]}</span>
+          </PromptInputSelectTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="top">Reasoning effort for this turn</TooltipContent>
+      </Tooltip>
+      <PromptInputSelectContent align="start">
+        {REASONING_EFFORTS.map((effort) => (
+          <PromptInputSelectItem key={effort} value={effort}>
+            <span className="flex flex-col items-start gap-0.5">
+              <span className="text-xs">{REASONING_LABELS[effort]}</span>
+              <span className="text-muted-foreground text-[11px]">
+                {REASONING_DESCRIPTIONS[effort]}
+              </span>
+            </span>
+          </PromptInputSelectItem>
+        ))}
+      </PromptInputSelectContent>
+    </PromptInputSelect>
   );
 }

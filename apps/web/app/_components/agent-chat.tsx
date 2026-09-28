@@ -13,10 +13,13 @@ import {
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import {
   PromptInput,
+  PromptInputBody,
   PromptInputButton,
+  PromptInputFooter,
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
   usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
@@ -157,24 +160,26 @@ export function AgentChat({
 
   const composer = (
     <PromptInput onSubmit={handleSubmit}>
-      <PromptInputTextarea
-        disabled={isResuming}
-        onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
-        placeholder="Send a message…"
-      />
-      <div className="flex items-center justify-between gap-2 px-2 pb-2">
-        {reasoningOnChange ? (
-          <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />
-        ) : (
-          <span />
-        )}
+      <PromptInputBody>
+        <PromptInputTextarea
+          disabled={isResuming}
+          onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
+          placeholder="Send a message…"
+        />
+      </PromptInputBody>
+      <PromptInputFooter>
+        <PromptInputTools>
+          {reasoningOnChange ? (
+            <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />
+          ) : null}
+        </PromptInputTools>
         <ComposerAction
           hasInputText={hasInputText}
           isBusy={isBusy}
           isResuming={isResuming}
           onCancel={requestCancellation}
         />
-      </div>
+      </PromptInputFooter>
     </PromptInput>
   );
 
@@ -182,7 +187,7 @@ export function AgentChat({
     <main
       className={cn(
         "flex flex-col overflow-hidden bg-background text-foreground",
-        embedded ? "h-full min-h-0 min-w-0 flex-1" : "h-dvh",
+        embedded ? "h-svh min-h-0 min-w-0 flex-1" : "h-dvh",
       )}
     >
       {showConversationLayout ? (
@@ -236,7 +241,7 @@ export function AgentChat({
           "mx-auto w-full px-4 sm:px-6",
           showConversationLayout
             ? embedded
-              ? "fixed right-0 bottom-0 z-20 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6 left-[var(--chat-offset,0px)]"
+              ? "fixed right-0 bottom-0 left-0 z-20 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6 md:left-[var(--chat-offset,0px)]"
               : "fixed bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6"
             : "flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
         )}
@@ -314,7 +319,7 @@ function ChatHeader({
     <header
       className={cn(
         "pointer-events-none fixed top-0 right-0 z-20 h-14",
-        embedded && "left-[var(--chat-offset,0px)]",
+        embedded && "left-0 md:left-[var(--chat-offset,0px)]",
         !embedded && "left-0",
       )}
     >

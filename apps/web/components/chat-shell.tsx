@@ -1,10 +1,9 @@
 "use client";
 
-import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import { useCallback, useState, type CSSProperties } from "react";
 import { AgentChat } from "@/app/_components/agent-chat";
 import { ChatSidebar } from "@/components/chat-sidebar";
-import { Button } from "@/components/ui/button";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Tooltip,
   TooltipContent,
@@ -22,9 +21,9 @@ import {
   upsertSession,
   type ChatSessionEntry,
 } from "@/lib/sessions";
-import { cn } from "@/lib/utils";
 
 const SIDEBAR_WIDTH = "18rem";
+const SIDEBAR_ICON_WIDTH = "3rem";
 
 export function ChatShell() {
   const [sessions, setSessions] = useState<ChatSessionEntry[]>(loadSessions);
@@ -60,13 +59,10 @@ export function ChatShell() {
     setSessions((previous) => upsertSession(previous, sessionId));
   }, []);
 
-  const handleDelete = useCallback(
-    (sessionId: string) => {
-      setSessions((previous) => removeSession(previous, sessionId));
-      setActiveId((current) => (current === sessionId ? null : current));
-    },
-    [],
-  );
+  const handleDelete = useCallback((sessionId: string) => {
+    setSessions((previous) => removeSession(previous, sessionId));
+    setActiveId((current) => (current === sessionId ? null : current));
+  }, []);
 
   const handleReasoningChange = useCallback((effort: ReasoningEffort) => {
     setReasoningEffort(effort);
@@ -74,61 +70,33 @@ export function ChatShell() {
   }, []);
 
   return (
-    <div
-      className="flex h-dvh overflow-hidden bg-background text-foreground"
-      style={{ "--chat-offset": sidebarOpen ? SIDEBAR_WIDTH : "0px" } as CSSProperties}
+    <SidebarProvider
+      onOpenChange={setSidebarOpen}
+      open={sidebarOpen}
+      style={
+        {
+          "--sidebar-width": SIDEBAR_WIDTH,
+          "--sidebar-width-icon": SIDEBAR_ICON_WIDTH,
+          "--chat-offset": sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_ICON_WIDTH,
+        } as CSSProperties
+      }
     >
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "h-full shrink-0 overflow-hidden border-r transition-[width] duration-200",
-          "fixed z-40 md:static",
-          sidebarOpen ? "w-72" : "w-0 border-r-0",
-        )}
-        style={sidebarOpen ? { width: SIDEBAR_WIDTH } : undefined}
-        inert={!sidebarOpen}
-      >
-        <div className="h-full w-72">
-          <ChatSidebar
-            activeId={activeId}
-            onDelete={handleDelete}
-            onNew={handleNew}
-            onSelect={handleSelect}
-            sessions={sessions}
-          />
-        </div>
-      </aside>
-      {sidebarOpen ? (
-        <button
-          aria-label="Close sidebar"
-          className="fixed inset-0 z-30 bg-background/60 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-          type="button"
-        />
-      ) : null}
-
-      {/* Chat pane */}
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="pointer-events-none fixed top-3 left-4 z-30">
+      <ChatSidebar
+        activeId={activeId}
+        onDelete={handleDelete}
+        onNew={handleNew}
+        onSelect={handleSelect}
+        sessions={sessions}
+      />
+      <SidebarInset>
+        <div className="pointer-events-none fixed top-3 left-4 z-30 md:left-[calc(var(--chat-offset,0px)+1rem)]">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-                className="pointer-events-auto"
-                onClick={() => setSidebarOpen((open) => !open)}
-                size="icon-sm"
-                variant="ghost"
-              >
-                {sidebarOpen ? (
-                  <PanelLeftCloseIcon className="size-4" />
-                ) : (
-                  <PanelLeftOpenIcon className="size-4" />
-                )}
-              </Button>
+              <span className="pointer-events-auto inline-flex">
+                <SidebarTrigger />
+              </span>
             </TooltipTrigger>
-            <TooltipContent side="right">
-              {sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-            </TooltipContent>
+            <TooltipContent side="right">Toggle sidebar (⌘B)</TooltipContent>
           </Tooltip>
         </div>
         <AgentChat
@@ -143,7 +111,7 @@ export function ChatShell() {
           sessionId={activeId ?? undefined}
           sessionless={activeId === null}
         />
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
