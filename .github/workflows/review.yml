@@ -10,8 +10,9 @@ permissions:
 
 jobs:
   review:
-    # Forks don't have the secret; skip silently instead of failing the PR.
-    if: ${{ secrets.OPENCODE_API_KEY != '' }}
+    # No job-level secret gate: GitHub rejects `secrets` in job `if`.
+    # Fork safety comes from the script (skips without a key) + the
+    # hashFiles gate on the comment step.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
