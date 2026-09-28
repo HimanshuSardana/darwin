@@ -39,6 +39,7 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { Button } from "@/components/ui/button";
+import { PlanTodos, parsePlanTodos } from "@/components/plan-todos";
 import { cn } from "@/lib/utils";
 
 export type AgentInputResponse = {
@@ -145,9 +146,12 @@ function AgentMessagePart({
             type="dynamic-tool"
           />
           <ToolContent>
+            {part.toolName === "update_plan" ? (
+              <PlanTodosBlock input={part.input} output={part.output} />
+            ) : null}
             {part.toolName === "bash" ? (
               <BashToolContent errorText={part.errorText} input={part.input} output={part.output} />
-            ) : (
+            ) : part.toolName === "update_plan" ? null : (
               <ToolInput input={part.input} />
             )}
             <InputRequestActions
@@ -155,7 +159,7 @@ function AgentMessagePart({
               part={part}
               onInputResponses={onInputResponses}
             />
-            {part.toolName === "bash" ? null : (
+            {part.toolName === "bash" || part.toolName === "update_plan" ? null : (
               <ToolOutput errorText={part.errorText} output={part.output} />
             )}
           </ToolContent>
@@ -163,6 +167,18 @@ function AgentMessagePart({
       );
     }
   }
+}
+
+function PlanTodosBlock({
+  input,
+  output,
+}: {
+  readonly input: unknown;
+  readonly output: unknown;
+}) {
+  const plan = parsePlanTodos(input, output);
+  if (!plan) return null;
+  return <PlanTodos summary={plan.summary} todos={plan.todos} />;
 }
 
 function QuestionRequest({

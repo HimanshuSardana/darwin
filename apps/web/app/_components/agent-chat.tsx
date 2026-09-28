@@ -2,8 +2,8 @@
 
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
-import { AlertCircleIcon, BrainIcon, PlusIcon, SquareIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, ListChecksIcon, PlusIcon, SquareIcon } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -24,8 +24,11 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
+import { ModeSelect } from "@/components/mode-select";
+import { PlanTodos, parsePlanTodos } from "@/components/plan-todos";
 import { ReasoningSelect } from "@/components/reasoning-select";
 import { WorkspaceSelect } from "@/components/workspace-select";
+import { modeClientContext, type Mode } from "@/lib/mode";
 import {
   reasoningClientContext,
   type ReasoningEffort,
@@ -48,6 +51,8 @@ export function AgentChat({
   reasoningOnChange,
   workspace = "vm",
   workspaceOnChange,
+  mode = "build",
+  modeOnChange,
   sessionId,
   sessionless = false,
 }: {
@@ -67,6 +72,9 @@ export function AgentChat({
   /** Composer workspace; sent as ephemeral turn context. */
   readonly workspace?: Workspace;
   readonly workspaceOnChange?: (workspace: Workspace) => void;
+  /** Composer plan/build mode; sent first as ephemeral turn context. */
+  readonly mode?: Mode;
+  readonly modeOnChange?: (mode: Mode) => void;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
@@ -112,6 +120,31 @@ export function AgentChat({
   const showPendingThinking =
     isBusy &&
     (agent.status === "submitted" || lastMessage?.role !== "assistant" || isPendingAssistantShell);
+  const activePlan = useMemo(() => {
+    const messages = agent.data.messages;
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const parts = messages[index].parts;
+      for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
+        const part = parts[partIndex] as {
+          readonly input?: unknown;
+          readonly output?: unknown;
+          readonly toolName?: unknown;
+          readonly type?: string;
+        };
+        if (part.type === "dynamic-tool" && part.toolName === "update_plan") {
+          const plan = parsePlanTodos(part.input, part.output);
+          if (plan) return plan;
+        }
+      }
+    }
+    return null;
+  }, [agent.data.messages]);
+  const activeTodoCount = activePlan
+    ? activePlan.todos.filter((todo) => todo.status === "completed").length
+    : 0;
+  const showPlanBar =
+    activePlan !== null && activeTodoCount < activePlan.todos.length;
+  const [planExpanded, setPlanExpanded] = useState(false);
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = sessionless || !isEmpty || errorMessage !== undefined;
@@ -132,6 +165,7 @@ export function AgentChat({
     setHasInputText(false);
     setCancellationError(undefined);
     const contexts = [
+      modeClientContext(mode),
       reasoningClientContext(reasoningEffort),
       workspaceClientContext(workspace),
     ].filter((entry): entry is string => entry !== undefined);
@@ -179,6 +213,9 @@ export function AgentChat({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
+          {modeOnChange ? (
+            <ModeSelect onChange={modeOnChange} value={mode} />
+          ) : null}
           {workspaceOnChange ? (
             <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
           ) : null}
@@ -272,7 +309,35 @@ export function AgentChat({
             <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
           </div>
         )}
-        <div className="w-full">{composer}</div>
+        <div className="w-full">
+          {showPlanBar && activePlan ? (
+            <div className="mb-2">
+              <button
+                aria-expanded={planExpanded}
+                className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent/60"
+                onClick={() => setPlanExpanded((open) => !open)}
+                type="button"
+              >
+                <ListChecksIcon className="size-4 text-muted-foreground" />
+                <span className="font-medium">Plan</span>
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {activeTodoCount}/{activePlan.todos.length}
+                </span>
+                {planExpanded ? (
+                  <ChevronUpIcon className="size-4 text-muted-foreground ml-auto" />
+                ) : (
+                  <ChevronDownIcon className="size-4 text-muted-foreground ml-auto" />
+                )}
+              </button>
+              {planExpanded ? (
+                <div className="mt-2">
+                  <PlanTodos summary={activePlan.summary} todos={activePlan.todos} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {composer}
+        </div>
       </div>
     </main>
   );
