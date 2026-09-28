@@ -24,8 +24,10 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
+import { ModeSelect } from "@/components/mode-select";
 import { ReasoningSelect } from "@/components/reasoning-select";
 import { WorkspaceSelect } from "@/components/workspace-select";
+import { modeClientContext, type Mode } from "@/lib/mode";
 import {
   reasoningClientContext,
   type ReasoningEffort,
@@ -48,6 +50,8 @@ export function AgentChat({
   reasoningOnChange,
   workspace = "vm",
   workspaceOnChange,
+  mode = "build",
+  modeOnChange,
   sessionId,
   sessionless = false,
 }: {
@@ -67,6 +71,9 @@ export function AgentChat({
   /** Composer workspace; sent as ephemeral turn context. */
   readonly workspace?: Workspace;
   readonly workspaceOnChange?: (workspace: Workspace) => void;
+  /** Composer plan/build mode; sent first as ephemeral turn context. */
+  readonly mode?: Mode;
+  readonly modeOnChange?: (mode: Mode) => void;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
@@ -132,6 +139,7 @@ export function AgentChat({
     setHasInputText(false);
     setCancellationError(undefined);
     const contexts = [
+      modeClientContext(mode),
       reasoningClientContext(reasoningEffort),
       workspaceClientContext(workspace),
     ].filter((entry): entry is string => entry !== undefined);
@@ -179,6 +187,9 @@ export function AgentChat({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
+          {modeOnChange ? (
+            <ModeSelect onChange={modeOnChange} value={mode} />
+          ) : null}
           {workspaceOnChange ? (
             <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
           ) : null}

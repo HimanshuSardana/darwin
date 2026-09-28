@@ -9,6 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { loadMode, saveMode, type Mode } from "@/lib/mode";
 import {
   loadReasoningEffort,
   saveReasoningEffort,
@@ -37,6 +38,7 @@ export function ChatShell() {
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffort>(loadReasoningEffort);
   const [workspace, setWorkspace] = useState<Workspace>(loadWorkspace);
+  const [mode, setMode] = useState<Mode>(loadMode);
 
   const handleSessionChange = useCallback((session: { readonly sessionId: string }) => {
     setSessions((previous) => upsertSession(previous, session.sessionId));
@@ -80,6 +82,11 @@ export function ChatShell() {
     saveWorkspace(next);
   }, []);
 
+  const handleModeChange = useCallback((next: Mode) => {
+    setMode(next);
+    saveMode(next);
+  }, []);
+
   return (
     <SidebarProvider
       onOpenChange={setSidebarOpen}
@@ -120,6 +127,8 @@ export function ChatShell() {
           reasoningOnChange={handleReasoningChange}
           workspace={workspace}
           workspaceOnChange={handleWorkspaceChange}
+          mode={mode}
+          modeOnChange={handleModeChange}
           sessionId={activeId ?? undefined}
           sessionless={activeId === null}
         />
