@@ -1,7 +1,10 @@
-/target/
-dist/
-node_modules/
-src-tauri/target/
-src-tauri/gen/
-*.log
+node_modules
+.env*
+.eve
+.vercel
+.next
+.output
+.nitro
+dist
 .DS_Store
+*.tsbuildinfo
