@@ -16,6 +16,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import type { ChatSessionEntry } from "@/lib/sessions";
 
@@ -44,6 +45,21 @@ export function ChatSidebar({
   readonly onSelect: (sessionId: string) => void;
   readonly sessions: readonly ChatSessionEntry[];
 }) {
+  // On mobile the sidebar is a Sheet overlay (separate openMobile state
+  // inside the provider). Dismiss it when the user picks a destination;
+  // on desktop this is a no-op.
+  const { isMobile, setOpenMobile } = useSidebar();
+  const dismissMobileSheet = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+  const handleSelect = (sessionId: string) => {
+    dismissMobileSheet();
+    onSelect(sessionId);
+  };
+  const handleNew = () => {
+    dismissMobileSheet();
+    onNew();
+  };
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -57,7 +73,7 @@ export function ChatSidebar({
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Conversations</SidebarGroupLabel>
-          <SidebarGroupAction onClick={onNew} title="New chat">
+          <SidebarGroupAction onClick={handleNew} title="New chat">
             <PlusIcon />
             <span className="sr-only">New chat</span>
           </SidebarGroupAction>
@@ -74,7 +90,7 @@ export function ChatSidebar({
                   <SidebarMenuItem key={session.sessionId}>
                     <SidebarMenuButton
                       isActive={session.sessionId === activeId}
-                      onClick={() => onSelect(session.sessionId)}
+                      onClick={() => handleSelect(session.sessionId)}
                       tooltip={session.title}
                     >
                       <MessageSquareTextIcon />
