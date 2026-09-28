@@ -3,7 +3,7 @@
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
 import { AlertCircleIcon, BrainIcon, PlusIcon, SquareIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -21,6 +21,11 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
+import { ReasoningSelect } from "@/components/reasoning-select";
+import {
+  reasoningClientContext,
+  type ReasoningEffort,
+} from "@/lib/reasoning";
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
 import { WEB_CHAT_AGENT } from "@/app/eve-agent";
@@ -29,14 +34,39 @@ const DEFAULT_AGENT_NAME = "eve-agent";
 const AGENT_NAME = WEB_CHAT_AGENT ?? DEFAULT_AGENT_NAME;
 
 export function AgentChat({
+  embedded = false,
+  manageHistory = true,
+  onFirstMessage,
+  onRequestNewChat,
+  onSessionChange,
+  reasoningEffort = "provider-default",
+  reasoningOnChange,
   sessionId,
   sessionless = false,
 }: {
+  /** Render inside the sidebar shell (offsets fixed chrome via --chat-offset). */
+  readonly embedded?: boolean;
+  /** When false, skips the standalone /s/:id history rewrite. */
+  readonly manageHistory?: boolean;
+  /** First user message of a fresh session (for sidebar titles). */
+  readonly onFirstMessage?: (text: string) => void;
+  /** Override the header "New chat" action (shell switches panes instead). */
+  readonly onRequestNewChat?: () => void;
+  /** Every durable session cursor the hook settles on. */
+  readonly onSessionChange?: (session: { readonly sessionId: string }) => void;
+  /** Composer reasoning effort; sent as ephemeral turn context. */
+  readonly reasoningEffort?: ReasoningEffort;
+  readonly reasoningOnChange?: (effort: ReasoningEffort) => void;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
   const [cancellationError, setCancellationError] = useState<string>();
   const [hasInputText, setHasInputText] = useState(false);
+  const titledSessionRef = useRef<string | null>(null);
+  const onSessionChangeRef = useRef(onSessionChange);
+  onSessionChangeRef.current = onSessionChange;
+  const onFirstMessageRef = useRef(onFirstMessage);
+  onFirstMessageRef.current = onFirstMessage;
   const agent = useEveAgent({
     agent: WEB_CHAT_AGENT,
     initialSession:
@@ -48,7 +78,8 @@ export function AgentChat({
           },
     resume: sessionId !== undefined,
     onSessionChange(session) {
-      if (sessionId === undefined && session !== undefined) {
+      if (session === undefined) return;
+      if (sessionId === undefined && manageHistory) {
         // Next patches window.history to navigate, which would detach the active stream.
         History.prototype.replaceState.call(
           window.history,
@@ -57,6 +88,7 @@ export function AgentChat({
           `/s/${encodeURIComponent(session.sessionId)}`,
         );
       }
+      onSessionChangeRef.current?.(session);
     },
   });
 
@@ -89,7 +121,18 @@ export function AgentChat({
 
     setHasInputText(false);
     setCancellationError(undefined);
-    const options = isBusy ? { turnPolicy: "steer" as const } : undefined;
+    const context = reasoningClientContext(reasoningEffort);
+    const options =
+      isBusy || context !== undefined
+        ? {
+            ...(isBusy ? { turnPolicy: "steer" as const } : {}),
+            ...(context !== undefined ? { clientContext: context } : {}),
+          }
+        : undefined;
+    if (text.length > 0 && titledSessionRef.current !== (sessionId ?? "new")) {
+      titledSessionRef.current = sessionId ?? "new";
+      onFirstMessageRef.current?.(text);
+    }
 
     if (message.files.length === 0) {
       await agent.send(text, options);
@@ -119,19 +162,35 @@ export function AgentChat({
         onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
         placeholder="Send a message…"
       />
-      <ComposerAction
-        hasInputText={hasInputText}
-        isBusy={isBusy}
-        isResuming={isResuming}
-        onCancel={requestCancellation}
-      />
+      <div className="flex items-center justify-between gap-2 px-2 pb-2">
+        {reasoningOnChange ? (
+          <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />
+        ) : (
+          <span />
+        )}
+        <ComposerAction
+          hasInputText={hasInputText}
+          isBusy={isBusy}
+          isResuming={isResuming}
+          onCancel={requestCancellation}
+        />
+      </div>
     </PromptInput>
   );
 
   return (
-    <main className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+    <main
+      className={cn(
+        "flex flex-col overflow-hidden bg-background text-foreground",
+        embedded ? "h-full min-h-0 min-w-0 flex-1" : "h-dvh",
+      )}
+    >
       {showConversationLayout ? (
-        <ChatHeader canStartNewChat={activeSessionId !== undefined} />
+        <ChatHeader
+          canStartNewChat={activeSessionId !== undefined}
+          embedded={embedded}
+          onRequestNewChat={onRequestNewChat}
+        />
       ) : null}
 
       {showConversationLayout ? (
@@ -176,7 +235,9 @@ export function AgentChat({
         className={cn(
           "mx-auto w-full px-4 sm:px-6",
           showConversationLayout
-            ? "fixed bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6"
+            ? embedded
+              ? "fixed right-0 bottom-0 z-20 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6 left-[var(--chat-offset,0px)]"
+              : "fixed bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6"
             : "flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
         )}
       >
@@ -185,7 +246,7 @@ export function AgentChat({
             <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
           </div>
         )}
-        <div className="w-full">{composer}</div>
+        <div className={cn("w-full", showConversationLayout && embedded && "mx-auto max-w-3xl")}>{composer}</div>
       </div>
     </main>
   );
@@ -240,16 +301,36 @@ function ErrorMessage({ message }: { readonly message: string }) {
   );
 }
 
-function ChatHeader({ canStartNewChat }: { readonly canStartNewChat: boolean }) {
+function ChatHeader({
+  canStartNewChat,
+  embedded,
+  onRequestNewChat,
+}: {
+  readonly canStartNewChat: boolean;
+  readonly embedded: boolean;
+  readonly onRequestNewChat?: () => void;
+}) {
   return (
-    <header className="pointer-events-none fixed top-0 right-0 left-0 z-20 h-14">
+    <header
+      className={cn(
+        "pointer-events-none fixed top-0 right-0 z-20 h-14",
+        embedded && "left-[var(--chat-offset,0px)]",
+        !embedded && "left-0",
+      )}
+    >
       <div className="relative mx-auto flex h-full w-full max-w-3xl items-center justify-center bg-background px-24">
         <span className="truncate text-muted-foreground text-sm">{AGENT_NAME}</span>
         {canStartNewChat ? (
           <Button
             aria-label="Start a new chat"
             className="pointer-events-auto fixed top-3 right-6 pr-4"
-            onClick={() => window.location.assign("/s")}
+            onClick={() => {
+              if (onRequestNewChat) {
+                onRequestNewChat();
+              } else {
+                window.location.assign("/s");
+              }
+            }}
             size="sm"
             type="button"
             variant="ghost"
