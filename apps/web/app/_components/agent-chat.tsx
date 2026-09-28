@@ -25,10 +25,12 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import { ReasoningSelect } from "@/components/reasoning-select";
+import { WorkspaceSelect } from "@/components/workspace-select";
 import {
   reasoningClientContext,
   type ReasoningEffort,
 } from "@/lib/reasoning";
+import { workspaceClientContext, type Workspace } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
 import { WEB_CHAT_AGENT } from "@/app/eve-agent";
@@ -44,6 +46,8 @@ export function AgentChat({
   onSessionChange,
   reasoningEffort = "provider-default",
   reasoningOnChange,
+  workspace = "vm",
+  workspaceOnChange,
   sessionId,
   sessionless = false,
 }: {
@@ -60,6 +64,9 @@ export function AgentChat({
   /** Composer reasoning effort; sent as ephemeral turn context. */
   readonly reasoningEffort?: ReasoningEffort;
   readonly reasoningOnChange?: (effort: ReasoningEffort) => void;
+  /** Composer workspace; sent as ephemeral turn context. */
+  readonly workspace?: Workspace;
+  readonly workspaceOnChange?: (workspace: Workspace) => void;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
@@ -124,12 +131,15 @@ export function AgentChat({
 
     setHasInputText(false);
     setCancellationError(undefined);
-    const context = reasoningClientContext(reasoningEffort);
+    const contexts = [
+      reasoningClientContext(reasoningEffort),
+      workspaceClientContext(workspace),
+    ].filter((entry): entry is string => entry !== undefined);
     const options =
-      isBusy || context !== undefined
+      isBusy || contexts.length > 0
         ? {
             ...(isBusy ? { turnPolicy: "steer" as const } : {}),
-            ...(context !== undefined ? { clientContext: context } : {}),
+            ...(contexts.length > 0 ? { clientContext: contexts } : {}),
           }
         : undefined;
     if (text.length > 0 && titledSessionRef.current !== (sessionId ?? "new")) {
@@ -169,6 +179,9 @@ export function AgentChat({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
+          {workspaceOnChange ? (
+            <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
+          ) : null}
           {reasoningOnChange ? (
             <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />
           ) : null}

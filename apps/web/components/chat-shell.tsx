@@ -15,6 +15,11 @@ import {
   type ReasoningEffort,
 } from "@/lib/reasoning";
 import {
+  loadWorkspace,
+  saveWorkspace,
+  type Workspace,
+} from "@/lib/workspace";
+import {
   loadSessions,
   removeSession,
   titleFromMessage,
@@ -31,6 +36,7 @@ export function ChatShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffort>(loadReasoningEffort);
+  const [workspace, setWorkspace] = useState<Workspace>(loadWorkspace);
 
   const handleSessionChange = useCallback((session: { readonly sessionId: string }) => {
     setSessions((previous) => upsertSession(previous, session.sessionId));
@@ -67,6 +73,11 @@ export function ChatShell() {
   const handleReasoningChange = useCallback((effort: ReasoningEffort) => {
     setReasoningEffort(effort);
     saveReasoningEffort(effort);
+  }, []);
+
+  const handleWorkspaceChange = useCallback((next: Workspace) => {
+    setWorkspace(next);
+    saveWorkspace(next);
   }, []);
 
   return (
@@ -107,6 +118,8 @@ export function ChatShell() {
           onSessionChange={handleSessionChange}
           reasoningEffort={reasoningEffort}
           reasoningOnChange={handleReasoningChange}
+          workspace={workspace}
+          workspaceOnChange={handleWorkspaceChange}
           sessionId={activeId ?? undefined}
           sessionless={activeId === null}
         />
