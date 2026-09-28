@@ -2,9 +2,9 @@ name: lint
 
 on:
   push:
-    branches: [master, "feat/**", "chore/**", "fix/**"]
+    branches: [main, "feat/**", "chore/**", "fix/**"]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
   typecheck:
