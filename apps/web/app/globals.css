@@ -1,5 +1,24 @@
 @import "tailwindcss";
-@source "../node_modules/streamdown/dist/*.js";
+/* Vendored from tw-animate-css (npm dep): Turbopack cannot resolve the
+   package's style-condition export from outside the Next root. */
+@import "./tw-animate.css";
+/* Streamdown renders its code-block chrome from node_modules, whose
+   utility classes Tailwind never emits (scanner ignores dep files and
+   @source registration has no effect in this setup). Float the actions
+   pill top-right with plain CSS instead. */
+[data-streamdown="code-block"] {
+  position: relative;
+}
+/* Collapse the in-flow actions row; the pill floats over the header. */
+[data-streamdown="code-block-header"] + div:has(> [data-streamdown="code-block-actions"]) {
+  display: contents;
+}
+[data-streamdown="code-block-actions"] {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+}
 
 @custom-variant dark (&:where(.dark, .dark *));
 
