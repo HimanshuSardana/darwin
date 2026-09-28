@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquareTextIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { MessageSquareTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +19,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { ChatSessionEntry } from "@/lib/sessions";
+import { useState } from "react";
+import { SettingsDialog } from "@/components/settings-dialog";
 
 function relativeTime(timestamp: number): string {
   const deltaMs = Date.now() - timestamp;
@@ -49,6 +51,7 @@ export function ChatSidebar({
   // inside the provider). Dismiss it when the user picks a destination;
   // on desktop this is a no-op.
   const { isMobile, setOpenMobile } = useSidebar();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const dismissMobileSheet = () => {
     if (isMobile) setOpenMobile(false);
   };
@@ -122,11 +125,20 @@ export function ChatSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setSettingsOpen(true)} tooltip="Settings">
+              <SettingsIcon />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <p className="text-muted-foreground px-2 py-1 text-[11px] group-data-[collapsible=icon]:hidden">
           Conversations persist on the agent; the list lives in this browser.
         </p>
       </SidebarFooter>
       <SidebarRail />
+      <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} />
     </Sidebar>
   );
 }

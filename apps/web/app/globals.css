@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @source "../node_modules/streamdown/dist/*.js";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -38,7 +40,6 @@
 
 :root {
   color-scheme: light;
-  /* Soft neutral page with white elevated surfaces so cards/composer pop. */
   --background: oklch(0.971 0 0);
   --foreground: oklch(0.16 0 0);
   --card: oklch(1 0 0);
@@ -68,8 +69,8 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Class-based dark mode (toggled from Settings → Appearance). */
+.dark {
     color-scheme: dark;
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
@@ -97,7 +98,6 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.439 0 0);
-  }
 }
 
 * {
