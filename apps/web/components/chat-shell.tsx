@@ -109,7 +109,7 @@ export function ChatShell() {
           : previous;
       });
     },
-    [activeId, workspaces],
+    [activeId, userId, workspaces],
   );
 
   const handleNew = useCallback(() => setActiveId(null), []);
