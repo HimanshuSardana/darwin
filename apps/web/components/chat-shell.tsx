@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { AgentChat } from "@/app/_components/agent-chat";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -21,6 +21,14 @@ import {
   type Workspace,
 } from "@/lib/workspace";
 import {
+  createEveSession,
+  createWorkspace,
+  deleteWorkspace,
+  listWorkspaces,
+  namedWorkspaceClientContext,
+  type WorkspaceRecord,
+} from "@/lib/workspaces";
+import {
   loadSessions,
   removeSession,
   titleFromMessage,
@@ -39,6 +47,8 @@ export function ChatShell() {
     useState<ReasoningEffort>(loadReasoningEffort);
   const [workspace, setWorkspace] = useState<Workspace>(loadWorkspace);
   const [mode, setMode] = useState<Mode>(loadMode);
+  const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceRecord | null>(null);
 
   const handleSessionChange = useCallback((session: { readonly sessionId: string }) => {
     setSessions((previous) => upsertSession(previous, session.sessionId));
@@ -47,17 +57,22 @@ export function ChatShell() {
 
   const handleFirstMessage = useCallback(
     (text: string) => {
+      const workspaceSessionIds = new Set(
+        workspaces.map((entry) => entry.sessionId).filter((id) => id !== null),
+      );
       setSessions((previous) => {
         const target = activeId
           ? previous.find((entry) => entry.sessionId === activeId)
           : previous[0];
         if (!target || target.title !== "New chat") return previous;
+        // Workspace-bound sessions keep the workspace name.
+        if (workspaceSessionIds.has(target.sessionId)) return previous;
         return upsertSession(previous, target.sessionId, {
           title: titleFromMessage(text),
         });
       });
     },
-    [activeId],
+    [activeId, workspaces],
   );
 
   const handleNew = useCallback(() => setActiveId(null), []);
@@ -87,6 +102,63 @@ export function ChatShell() {
     saveMode(next);
   }, []);
 
+  useEffect(() => {
+    listWorkspaces()
+      .then(({ workspaces }) => setWorkspaces(workspaces))
+      .catch(() => setWorkspaces([]));
+  }, []);
+
+  const handleSelectWorkspace = useCallback(
+    (selected: WorkspaceRecord | null) => {
+      setActiveWorkspace(selected);
+      if (!selected) return;
+      // Pair the execution target with the workspace kind (overridable after).
+      if (selected.provider === "host") {
+        setWorkspace("local");
+        saveWorkspace("local");
+      } else {
+        setWorkspace("vm");
+        saveWorkspace("vm");
+        if (selected.sessionId) {
+          const sessionId = selected.sessionId;
+          setSessions((previous) =>
+            upsertSession(previous, sessionId, { title: selected.name }),
+          );
+          setActiveId(sessionId);
+        }
+      }
+    },
+    [],
+  );
+
+  const handleNewWorkspace = useCallback(
+    async (input: { name: string; provider: "microvm" | "host" }) => {
+      const sessionId =
+        input.provider === "microvm" ? await createEveSession() : undefined;
+      const { workspace: record } = await createWorkspace({
+        name: input.name,
+        provider: input.provider,
+        sessionId,
+      });
+      const { workspaces: fresh } = await listWorkspaces();
+      setWorkspaces(fresh);
+      handleSelectWorkspace(record);
+    },
+    [handleSelectWorkspace],
+  );
+
+  const handleDeleteWorkspace = useCallback(
+    async (id: string) => {
+      await deleteWorkspace(id);
+      setActiveWorkspace((current) => (current?.id === id ? null : current));
+      const { workspaces: fresh } = await listWorkspaces().catch(() => ({
+        workspaces: [],
+      }));
+      setWorkspaces(fresh);
+    },
+    [],
+  );
+
   return (
     <SidebarProvider
       onOpenChange={setSidebarOpen}
@@ -100,10 +172,17 @@ export function ChatShell() {
     >
       <ChatSidebar
         activeId={activeId}
+        activeWorkspaceId={activeWorkspace?.id ?? null}
         onDelete={handleDelete}
+        onDeleteWorkspace={(id) => {
+          handleDeleteWorkspace(id).catch(() => {});
+        }}
         onNew={handleNew}
+        onNewWorkspace={handleNewWorkspace}
         onSelect={handleSelect}
+        onSelectWorkspace={handleSelectWorkspace}
         sessions={sessions}
+        workspaces={workspaces}
       />
       <SidebarInset>
         <div className="pointer-events-none fixed top-3 left-4 z-30 md:hidden">
@@ -129,6 +208,7 @@ export function ChatShell() {
           workspaceOnChange={handleWorkspaceChange}
           mode={mode}
           modeOnChange={handleModeChange}
+          namedWorkspaceContext={namedWorkspaceClientContext(activeWorkspace)}
           sessionId={activeId ?? undefined}
           sessionless={activeId === null}
         />

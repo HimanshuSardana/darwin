@@ -25,6 +25,8 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import { ModeSelect } from "@/components/mode-select";
+import { SlashMenu } from "@/components/slash-menu";
+import { matchSlashCommands, parseSlashCommand } from "@/lib/slash-commands";
 import { PlanTodos, parsePlanTodos } from "@/components/plan-todos";
 import { ReasoningSelect } from "@/components/reasoning-select";
 import { WorkspaceSelect } from "@/components/workspace-select";
@@ -53,6 +55,7 @@ export function AgentChat({
   workspaceOnChange,
   mode = "build",
   modeOnChange,
+  namedWorkspaceContext,
   sessionId,
   sessionless = false,
 }: {
@@ -75,6 +78,8 @@ export function AgentChat({
   /** Composer plan/build mode; sent first as ephemeral turn context. */
   readonly mode?: Mode;
   readonly modeOnChange?: (mode: Mode) => void;
+  /** Named persistent workspace context; appended to ephemeral turn context. */
+  readonly namedWorkspaceContext?: string | null;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
@@ -145,6 +150,13 @@ export function AgentChat({
   const showPlanBar =
     activePlan !== null && activeTodoCount < activePlan.todos.length;
   const [planExpanded, setPlanExpanded] = useState(false);
+  const [composerText, setComposerText] = useState("");
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashDismissed, setSlashDismissed] = useState(false);
+  const slashMatches = useMemo(
+    () => (slashDismissed ? [] : matchSlashCommands(composerText)),
+    [composerText, slashDismissed],
+  );
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = sessionless || !isEmpty || errorMessage !== undefined;
@@ -158,16 +170,64 @@ export function AgentChat({
     });
   };
 
+  const handleComposerChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const next = event.currentTarget.value;
+    setComposerText(next);
+    setHasInputText(next.trim().length > 0);
+    setSlashDismissed(false);
+    setSlashIndex(0);
+  };
+
+  const completeSlash = (name: string) => {
+    setComposerText(`/${name} `);
+    setSlashDismissed(true);
+    setHasInputText(false);
+  };
+
+  const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashMatches.length === 0) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setSlashDismissed(true);
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      const pick = slashMatches[Math.min(slashIndex, slashMatches.length - 1)];
+      if (pick) completeSlash(pick.name);
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSlashIndex((index) => (index + 1) % slashMatches.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSlashIndex((index) => (index + slashMatches.length - 1) % slashMatches.length);
+    }
+  };
+
   const handleSubmit = async (message: PromptInputMessage) => {
-    const text = message.text.trim();
-    if ((text.length === 0 && message.files.length === 0) || isResuming) return;
+    const rawText = message.text.trim();
+    if ((rawText.length === 0 && message.files.length === 0) || isResuming) return;
 
     setHasInputText(false);
+    setComposerText("");
+    setSlashDismissed(true);
     setCancellationError(undefined);
+    // Slash commands with a mode override rewrite this turn's mode; a bare
+    // "/plan" or "/build" just flips the composer toggle instead.
+    let text = rawText;
+    let effectiveMode = mode;
+    const parsed = parseSlashCommand(rawText);
+    if (parsed?.command.modeOverride) {
+      if (parsed.rest.length === 0) {
+        modeOnChange?.(parsed.command.modeOverride);
+        return;
+      }
+      text = parsed.rest;
+      effectiveMode = parsed.command.modeOverride;
+    }
     const contexts = [
-      modeClientContext(mode),
+      modeClientContext(effectiveMode),
       reasoningClientContext(reasoningEffort),
       workspaceClientContext(workspace),
+      namedWorkspaceContext ?? undefined,
     ].filter((entry): entry is string => entry !== undefined);
     const options =
       isBusy || contexts.length > 0
@@ -207,8 +267,10 @@ export function AgentChat({
       <PromptInputBody>
         <PromptInputTextarea
           disabled={isResuming}
-          onChange={(event) => setHasInputText(event.currentTarget.value.trim().length > 0)}
-          placeholder="Send a message…"
+          onChange={handleComposerChange}
+          onKeyDown={handleComposerKeyDown}
+          placeholder="Send a message… ( / for commands )"
+          value={composerText}
         />
       </PromptInputBody>
       <PromptInputFooter>
@@ -309,7 +371,14 @@ export function AgentChat({
             <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
           </div>
         )}
-        <div className="w-full">
+        <div className="relative w-full">
+          {slashMatches.length > 0 ? (
+            <SlashMenu
+              commands={slashMatches}
+              onPick={(command) => completeSlash(command.name)}
+              selectedIndex={Math.min(slashIndex, slashMatches.length - 1)}
+            />
+          ) : null}
           {showPlanBar && activePlan ? (
             <div className="mb-2">
               <button
