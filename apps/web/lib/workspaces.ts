@@ -5,6 +5,7 @@ export interface WorkspaceRecord {
   readonly id: string;
   readonly name: string;
   readonly provider: "microvm" | "host";
+  readonly ownerId?: string;
   /** Bound Eve session for microvm workspaces (owns the persistent sandbox). */
   readonly sessionId: string | null;
   /** Host directory for host workspaces. */

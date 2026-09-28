@@ -6,17 +6,21 @@ export interface ChatSessionEntry {
   updatedAt: number;
 }
 
-const STORAGE_KEY = "darwin.sessions.v1";
+const STORAGE_KEY_PREFIX = "darwin.sessions.v1.";
 const TITLE_MAX = 48;
+
+function storageKey(userId: string): string {
+  return `${STORAGE_KEY_PREFIX}${userId}`;
+}
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-export function loadSessions(): ChatSessionEntry[] {
+export function loadSessions(userId: string): ChatSessionEntry[] {
   if (!isBrowser()) return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey(userId));
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -33,10 +37,10 @@ export function loadSessions(): ChatSessionEntry[] {
   }
 }
 
-function persist(sessions: ChatSessionEntry[]): void {
+function persist(userId: string, sessions: ChatSessionEntry[]): void {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    window.localStorage.setItem(storageKey(userId), JSON.stringify(sessions));
   } catch {
     // Storage full or unavailable — sidebar simply won't persist.
   }
@@ -51,6 +55,7 @@ export function titleFromMessage(text: string): string {
 /** Insert or refresh an entry; returns the new list (newest first). */
 export function upsertSession(
   sessions: ChatSessionEntry[],
+  userId: string,
   sessionId: string,
   patch?: { readonly title?: string },
 ): ChatSessionEntry[] {
@@ -64,15 +69,32 @@ export function upsertSession(
       )
     : [{ sessionId, title: patch?.title ?? "New chat", updatedAt: now }, ...sessions];
   const sorted = [...next].sort((a, b) => b.updatedAt - a.updatedAt);
-  persist(sorted);
+  persist(userId, sorted);
   return sorted;
 }
 
 export function removeSession(
   sessions: ChatSessionEntry[],
+  userId: string,
   sessionId: string,
 ): ChatSessionEntry[] {
   const next = sessions.filter((entry) => entry.sessionId !== sessionId);
-  persist(next);
+  persist(userId, next);
   return next;
+}
+
+/** Register ownership server-side (first writer wins). Returns true if mine. */
+export async function claimSession(sessionId: string): Promise<boolean> {
+  try {
+    const response = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+    if (!response.ok) return false;
+    const data = (await response.json()) as { mine?: unknown };
+    return data.mine === true;
+  } catch {
+    return false;
+  }
 }

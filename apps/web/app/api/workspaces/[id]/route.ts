@@ -1,7 +1,9 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import type { WorkspaceRecord } from "../route";
 
 function storePath(): string {
@@ -14,6 +16,11 @@ export async function DELETE(
   { params }: { readonly params: Promise<{ readonly id: string }> },
 ) {
   const { id } = await params;
+  const session = await auth.api.getSession({ headers: await headers() });
+  const userId = session?.user?.id ?? null;
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   let all: WorkspaceRecord[];
   try {
     all = JSON.parse(await readFile(storePath(), "utf8")) as WorkspaceRecord[];
@@ -22,7 +29,7 @@ export async function DELETE(
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   const record = all.find((entry) => entry.id === id);
-  if (!record) {
+  if (!record || record.ownerId !== userId) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   // Remove the host directory for host workspaces; microvm disks stay with

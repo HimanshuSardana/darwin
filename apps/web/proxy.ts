@@ -27,6 +27,36 @@ export default async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api/auth/")) {
     return NextResponse.next();
   }
+  // Internal helpers answer for the caller's own cookie; never gate them.
+  // (Gating them here would recurse: the checks below call this endpoint.)
+  if (pathname.startsWith("/api/internal/")) {
+    return NextResponse.next();
+  }
+
+  // Session-scoped Eve routes additionally enforce per-user ownership
+  // (Eve itself does not: possession of a session ID is not authorization).
+  // Creation, health, and info carry no session ID and need auth only.
+  if (pathname.startsWith("/eve/")) {
+    const match = /^\/eve\/v1\/session\/([^/]+)/.exec(pathname);
+    const accessUrl = new URL("/api/internal/access", request.url);
+    if (match?.[1]) accessUrl.searchParams.set("sessionId", match[1]);
+    let allowed = false;
+    try {
+      const accessResponse = await fetch(accessUrl, {
+        headers: { cookie: request.headers.get("cookie") ?? "" },
+      });
+      const data = (await accessResponse.json().catch(() => null)) as {
+        allow?: unknown;
+      } | null;
+      allowed = accessResponse.ok && data?.allow === true;
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.next();
+  }
 
   let authenticated = false;
   try {
