@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquareTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
+import { ContainerIcon, LaptopIcon, MessageSquareTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -19,8 +19,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { ChatSessionEntry } from "@/lib/sessions";
+import type { WorkspaceProvider } from "@/components/workspace-dialog";
+import type { WorkspaceRecord } from "@/lib/workspaces";
 import { useState } from "react";
 import { SettingsDialog } from "@/components/settings-dialog";
+import { WorkspaceDialog } from "@/components/workspace-dialog";
 
 function relativeTime(timestamp: number): string {
   const deltaMs = Date.now() - timestamp;
@@ -36,22 +39,37 @@ function relativeTime(timestamp: number): string {
 
 export function ChatSidebar({
   activeId,
+  activeWorkspaceId,
   onDelete,
+  onDeleteWorkspace,
   onNew,
+  onNewWorkspace,
   onSelect,
+  onSelectWorkspace,
   sessions,
+  workspaces,
 }: {
   readonly activeId: string | null;
+  readonly activeWorkspaceId: string | null;
   readonly onDelete: (sessionId: string) => void;
+  readonly onDeleteWorkspace: (id: string) => void;
   readonly onNew: () => void;
+  readonly onNewWorkspace: (
+    input: { name: string; provider: WorkspaceProvider },
+  ) => Promise<void>;
   readonly onSelect: (sessionId: string) => void;
+  readonly onSelectWorkspace: (workspace: WorkspaceRecord | null) => void;
   readonly sessions: readonly ChatSessionEntry[];
+  readonly workspaces: readonly WorkspaceRecord[];
 }) {
   // On mobile the sidebar is a Sheet overlay (separate openMobile state
   // inside the provider). Dismiss it when the user picks a destination;
   // on desktop this is a no-op.
   const { isMobile, setOpenMobile } = useSidebar();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [workspaceDialogPending, setWorkspaceDialogPending] = useState(false);
+  const [workspaceDialogError, setWorkspaceDialogError] = useState<string | null>(null);
   const dismissMobileSheet = () => {
     if (isMobile) setOpenMobile(false);
   };
@@ -74,6 +92,61 @@ export function ChatSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+          <SidebarGroupAction
+            onClick={() => setWorkspaceDialogOpen(true)}
+            title="Spin up workspace"
+          >
+            <PlusIcon />
+            <span className="sr-only">Spin up workspace</span>
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            {workspaces.length === 0 ? null : (
+              <SidebarMenu>
+                {workspaces.map((workspaceRecord) => {
+                  const Icon =
+                    workspaceRecord.provider === "host" ? LaptopIcon : ContainerIcon;
+                  return (
+                    <SidebarMenuItem key={workspaceRecord.id}>
+                      <SidebarMenuButton
+                        isActive={workspaceRecord.id === activeWorkspaceId}
+                        onClick={() => {
+                          dismissMobileSheet();
+                          onSelectWorkspace(
+                            workspaceRecord.id === activeWorkspaceId ? null : workspaceRecord,
+                          );
+                        }}
+                        tooltip={workspaceRecord.name}
+                      >
+                        <Icon />
+                        <span>
+                          <span className="block truncate font-normal">
+                            {workspaceRecord.name}
+                          </span>
+                          <span className="text-muted-foreground block text-[11px]">
+                            {workspaceRecord.provider === "host" ? "Host directory" : "MicroVM"}
+                          </span>
+                        </span>
+                      </SidebarMenuButton>
+                      <SidebarMenuAction
+                        aria-label={`Delete workspace "${workspaceRecord.name}"`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteWorkspace(workspaceRecord.id);
+                        }}
+                        showOnHover
+                        title="Delete workspace"
+                      >
+                        <Trash2Icon />
+                      </SidebarMenuAction>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Conversations</SidebarGroupLabel>
           <SidebarGroupAction onClick={handleNew} title="New chat">
@@ -139,6 +212,29 @@ export function ChatSidebar({
       </SidebarFooter>
       <SidebarRail />
       <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} />
+      <WorkspaceDialog
+        error={workspaceDialogError}
+        onOpenChange={(open) => {
+          setWorkspaceDialogOpen(open);
+          if (open) setWorkspaceDialogError(null);
+        }}
+        onSubmit={async (input) => {
+          setWorkspaceDialogPending(true);
+          setWorkspaceDialogError(null);
+          try {
+            await onNewWorkspace(input);
+            setWorkspaceDialogOpen(false);
+          } catch (error) {
+            setWorkspaceDialogError(
+              error instanceof Error ? error.message : "Could not spin up workspace.",
+            );
+          } finally {
+            setWorkspaceDialogPending(false);
+          }
+        }}
+        open={workspaceDialogOpen}
+        pending={workspaceDialogPending}
+      />
     </Sidebar>
   );
 }

@@ -53,6 +53,7 @@ export function AgentChat({
   workspaceOnChange,
   mode = "build",
   modeOnChange,
+  namedWorkspaceContext,
   sessionId,
   sessionless = false,
 }: {
@@ -75,6 +76,8 @@ export function AgentChat({
   /** Composer plan/build mode; sent first as ephemeral turn context. */
   readonly mode?: Mode;
   readonly modeOnChange?: (mode: Mode) => void;
+  /** Named persistent workspace context; appended to ephemeral turn context. */
+  readonly namedWorkspaceContext?: string | null;
   readonly sessionId?: string;
   readonly sessionless?: boolean;
 }) {
@@ -168,6 +171,7 @@ export function AgentChat({
       modeClientContext(mode),
       reasoningClientContext(reasoningEffort),
       workspaceClientContext(workspace),
+      namedWorkspaceContext ?? undefined,
     ].filter((entry): entry is string => entry !== undefined);
     const options =
       isBusy || contexts.length > 0
