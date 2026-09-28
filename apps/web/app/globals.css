@@ -4,20 +4,34 @@
 @import "./tw-animate.css";
 /* Streamdown renders its code-block chrome from node_modules, whose
    utility classes Tailwind never emits (scanner ignores dep files and
-   @source registration has no effect in this setup). Float the actions
-   pill top-right with plain CSS instead. */
+   @source registration has no effect in this setup). Chrome the block
+   with plain CSS instead: no header band, the code body fills the card,
+   and bare buttons float over its top-right corner. */
 [data-streamdown="code-block"] {
   position: relative;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
 }
-/* Collapse the in-flow actions row; the pill floats over the header. */
+[data-streamdown="code-block-header"] {
+  display: none;
+}
+/* Collapse the in-flow actions row; the pill floats instead. */
 [data-streamdown="code-block-header"] + div:has(> [data-streamdown="code-block-actions"]) {
   display: contents;
 }
 [data-streamdown="code-block-actions"] {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 0.625rem;
+  right: 0.625rem;
   z-index: 10;
+  border-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+}
+/* Keep long first lines clear of the overlaid buttons. */
+[data-streamdown="code-block-body"] {
+  padding-right: 4.25rem;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
