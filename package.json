@@ -14,7 +14,8 @@
     "start": "eve start",
     "typecheck": "tsc",
     "dev:web": "next dev apps/web",
-    "build:web": "next build apps/web"
+    "build:web": "next build apps/web",
+    "db:migrate": "npx @better-auth/cli migrate --config ./apps/web/lib/auth.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.78",
@@ -30,10 +31,13 @@
     "@tailwindcss/postcss": "^4.3.0",
     "@vercel/connect": "2.2.0",
     "ai": "^7.0.105",
+    "better-auth": "^1.7.6",
+    "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "eve": "^0.67.2",
+    "kysely": "^0.29.6",
     "lucide-react": "^1.16.0",
     "motion": "^12.40.0",
     "nanoid": "^5.1.11",
@@ -50,6 +54,8 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@better-auth/cli": "^1.4.22",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
