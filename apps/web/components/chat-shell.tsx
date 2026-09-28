@@ -77,7 +77,6 @@ export function ChatShell() {
         {
           "--sidebar-width": SIDEBAR_WIDTH,
           "--sidebar-width-icon": SIDEBAR_ICON_WIDTH,
-          "--chat-offset": sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_ICON_WIDTH,
         } as CSSProperties
       }
     >
@@ -89,14 +88,14 @@ export function ChatShell() {
         sessions={sessions}
       />
       <SidebarInset>
-        <div className="pointer-events-none fixed top-3 left-4 z-30 md:left-[calc(var(--chat-offset,0px)+1rem)]">
+        <div className="pointer-events-none fixed top-3 left-4 z-30 md:hidden">
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="pointer-events-auto inline-flex">
                 <SidebarTrigger />
               </span>
             </TooltipTrigger>
-            <TooltipContent side="right">Toggle sidebar (⌘B)</TooltipContent>
+            <TooltipContent side="right">Show sidebar</TooltipContent>
           </Tooltip>
         </div>
         <AgentChat

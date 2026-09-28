@@ -8,11 +8,6 @@ import {
   PromptInputSelectTrigger,
 } from "@/components/ai-elements/prompt-input";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   REASONING_DESCRIPTIONS,
   REASONING_EFFORTS,
   REASONING_LABELS,
@@ -37,18 +32,17 @@ export function ReasoningSelect({
       onValueChange={(next) => onChange(next as ReasoningEffort)}
       value={value}
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PromptInputSelectTrigger
-            aria-label="Reasoning effort"
-            className="h-8 gap-1.5 px-2 text-xs"
-          >
-            <BrainIcon className="size-3.5" />
-            <span className="font-normal">{REASONING_LABELS[value]}</span>
-          </PromptInputSelectTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="top">Reasoning effort for this turn</TooltipContent>
-      </Tooltip>
+      {/* No Tooltip wrapper here: it competes with Radix Select for pointer
+          events on the trigger. `title` gives the hover text instead. */}
+      <PromptInputSelectTrigger
+        aria-label="Reasoning effort"
+        className="h-8 gap-1.5 px-2 text-xs"
+        title="Reasoning effort for this turn"
+        type="button"
+      >
+        <BrainIcon className="size-3.5" />
+        <span className="font-normal">{REASONING_LABELS[value]}</span>
+      </PromptInputSelectTrigger>
       <PromptInputSelectContent align="start">
         {REASONING_EFFORTS.map((effort) => (
           <PromptInputSelectItem key={effort} value={effort}>

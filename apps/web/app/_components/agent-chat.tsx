@@ -47,7 +47,7 @@ export function AgentChat({
   sessionId,
   sessionless = false,
 }: {
-  /** Render inside the sidebar shell (offsets fixed chrome via --chat-offset). */
+  /** Render inside the sidebar shell as a static flex column. */
   readonly embedded?: boolean;
   /** When false, skips the standalone /s/:id history rewrite. */
   readonly manageHistory?: boolean;
@@ -209,8 +209,13 @@ export function AgentChat({
               : `eve:web-chat-scroll:${activeSessionId}`
           }
         >
-          <ConversationTopFade className="top-14" />
-          <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-4 pt-20 pb-36 sm:px-6">
+          <ConversationTopFade className={embedded ? "top-0" : "top-14"} />
+          <ConversationContent
+            className={cn(
+              "mx-auto w-full max-w-3xl gap-6 px-4 sm:px-6",
+              embedded ? "pt-6 pb-10" : "pt-20 pb-36",
+            )}
+          >
             {agent.data.messages.map((message, index) =>
               showPendingThinking &&
               isPendingAssistantShell &&
@@ -238,12 +243,15 @@ export function AgentChat({
 
       <div
         className={cn(
-          "mx-auto w-full px-4 sm:px-6",
+          "w-full px-4 sm:px-6",
           showConversationLayout
-            ? embedded
-              ? "fixed right-0 bottom-0 left-0 z-20 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6 md:left-[var(--chat-offset,0px)]"
-              : "fixed bottom-0 left-1/2 z-20 max-w-3xl -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4 pb-6"
-            : "flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
+            ? // Static flex child in embedded mode: centers by construction,
+              // no viewport math. Standalone keeps the overlay composer.
+              "mx-auto max-w-3xl shrink-0 pt-2 pb-6"
+            : "mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
+          !embedded &&
+            showConversationLayout &&
+            "fixed bottom-0 left-1/2 z-20 -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4",
         )}
       >
         {showConversationLayout ? null : (
@@ -251,7 +259,7 @@ export function AgentChat({
             <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
           </div>
         )}
-        <div className={cn("w-full", showConversationLayout && embedded && "mx-auto max-w-3xl")}>{composer}</div>
+        <div className="w-full">{composer}</div>
       </div>
     </main>
   );
@@ -318,9 +326,8 @@ function ChatHeader({
   return (
     <header
       className={cn(
-        "pointer-events-none fixed top-0 right-0 z-20 h-14",
-        embedded && "left-0 md:left-[var(--chat-offset,0px)]",
-        !embedded && "left-0",
+        "pointer-events-none z-20 h-14 shrink-0",
+        embedded ? "static" : "fixed top-0 right-0 left-0",
       )}
     >
       <div className="relative mx-auto flex h-full w-full max-w-3xl items-center justify-center bg-background px-24">
