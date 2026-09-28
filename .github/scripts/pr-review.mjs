@@ -78,13 +78,26 @@ async function main() {
         "x-opencode-session": `darwin-pr-review-${PR_NUMBER ?? "adhoc"}`,
         "user-agent": "darwin-pr-review/1.0",
       },
-      body: JSON.stringify({ model: MODEL, input, max_output_tokens: 4000 }),
+      body: JSON.stringify({
+        model: MODEL,
+        input,
+        // Medium reasoning: high starves the message budget on large diffs
+        // (reasoning alone can exhaust max_output_tokens -> incomplete).
+        reasoning: { effort: "medium" },
+        max_output_tokens: 8000,
+      }),
     });
     if (!response.ok) {
       console.log(`Review API returned ${response.status}; skipping.`);
       return;
     }
-    const text = extractText(await response.json());
+    const payload = await response.json();
+    console.log(
+      `Review status: ${payload.status ?? "unknown"}` +
+        (payload.incomplete_details ? ` (${JSON.stringify(payload.incomplete_details)})` : "") +
+        (payload.usage ? ` | tokens: ${payload.usage.total_tokens ?? "?"}` : ""),
+    );
+    const text = extractText(payload);
     if (!text) {
       console.log("Empty review response; skipping.");
       return;
