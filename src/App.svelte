@@ -8,8 +8,6 @@ import { flip } from "svelte/animate";
 import Markdown from "./lib/Markdown.svelte";
 import ToolActivity from "./lib/ToolActivity.svelte";
 import CommandPalette from "./lib/CommandPalette.svelte";
-import ArrowLeft from "lucide-svelte/icons/arrow-left";
-import ArrowRight from "lucide-svelte/icons/arrow-right";
 import ChevronDown from "lucide-svelte/icons/chevron-down";
 import Folder from "lucide-svelte/icons/folder";
 import FolderOpen from "lucide-svelte/icons/folder-open";
@@ -61,9 +59,6 @@ let searchOpen = $state(false);
 let searchQuery = $state("");
 let newOpen = $state(false);
 let newCwd = $state("");
-let backStack = $state([]);
-let fwdStack = $state([]);
-
 let menuOpen = $state(false);
 let renaming = $state(false);
 let renameValue = $state("");
@@ -318,8 +313,6 @@ async function createSession(cwd) {
   try {
     const id = await invoke("create_session", { cwd: cwd?.trim() || null });
     await refreshSessions();
-    if (activeId) backStack.push(activeId);
-    fwdStack = [];
     activeId = id;
     ensureSession(id);
     newOpen = false;
@@ -330,11 +323,7 @@ async function createSession(cwd) {
   }
 }
 
-async function selectSession(id, push = true) {
-  if (push && activeId && activeId !== id) {
-    backStack.push(activeId);
-    fwdStack = [];
-  }
+async function selectSession(id) {
   activeId = id;
   ensureSession(id);
   modelPickerOpen = false;
@@ -349,28 +338,6 @@ async function selectSession(id, push = true) {
       refreshMeta(id);
   } catch (e) {
     error = String(e);
-  }
-}
-
-function goBack() {
-  while (backStack.length) {
-    const id = backStack.pop();
-    if (id && sessions.some((s) => s.id === id)) {
-      fwdStack.push(activeId);
-      selectSession(id, false);
-      return;
-    }
-  }
-}
-
-function goFwd() {
-  while (fwdStack.length) {
-    const id = fwdStack.pop();
-    if (id && sessions.some((s) => s.id === id)) {
-      backStack.push(activeId);
-      selectSession(id, false);
-      return;
-    }
   }
 }
 
@@ -449,8 +416,6 @@ async function destroy() {
     delete currentModel[id];
     delete titles[id];
     menuOpen = false;
-    backStack = backStack.filter((x) => x !== id);
-    fwdStack = fwdStack.filter((x) => x !== id);
     activeId = null;
     await refreshSessions();
   } catch (e) {
@@ -547,43 +512,15 @@ onMount(async () => {
   <!-- ─────────── sidebar ─────────── -->
   {#if !sidebarHidden}
     <aside
-      transition:slide={{ duration: dur(220) }}
+      transition:slide={{ duration: dur(220), axis: "x" }}
       class="flex w-[284px] shrink-0 flex-col border-r border-line/70 bg-surface"
     >
-      <div data-tauri-drag-region class="flex items-center gap-0.5 px-3 pt-3 pb-2">
-        <button
-          onclick={winClose}
-          title="Close"
-          class="group grid h-7 w-7 place-items-center rounded-md transition-colors hover:bg-surface-3"
-        >
-          <span class="h-2.5 w-2.5 rounded-full bg-line-strong transition-colors group-hover:bg-red-400"></span>
-        </button>
-        <button
-          onclick={winMin}
-          title="Minimize"
-          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-        ><Minus size={14} /></button>
-        <button
-          onclick={winMax}
-          title="Maximize"
-          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-        ><Square size={11} /></button>
-        <span class="mx-1 h-4 w-px bg-line"></span>
+      <div data-tauri-drag-region class="flex items-center px-3 pt-3 pb-2">
         <button
           onclick={() => (sidebarHidden = true)}
           title="Hide sidebar"
           class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
         ><PanelLeftClose size={15} /></button>
-        <button
-          onclick={goBack}
-          title="Back"
-          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-        ><ArrowLeft size={15} /></button>
-        <button
-          onclick={goFwd}
-          title="Forward"
-          class="grid h-7 w-7 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-3 hover:text-ink"
-        ><ArrowRight size={15} /></button>
       </div>
 
       <div class="flex flex-col gap-0.5 px-2.5 pt-1">
