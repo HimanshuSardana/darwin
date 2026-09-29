@@ -47,6 +47,10 @@ export function ChatShell() {
   const userId = authSession?.user?.id ?? null;
   const [sessions, setSessions] = useState<ChatSessionEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // The hook's own live session, for sidebar highlight. Distinct from
+  // activeId (which drives remounts): adopting a fresh session into
+  // activeId would remount AgentChat mid-send and wipe its pending state.
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffort>(loadReasoningEffort);
@@ -86,7 +90,10 @@ export function ChatShell() {
         void claimSession(session.sessionId);
         setSessions((previous) => upsertSession(previous, userId, session.sessionId));
       }
-      setActiveId(session.sessionId);
+      // Adopt only into a fresh pane: remounting on first send would
+      // destroy the hook store (and the optimistic sending bubble).
+      setActiveId((current) => current ?? session.sessionId);
+      setLiveSessionId(session.sessionId);
     },
     [userId],
   );
@@ -113,11 +120,15 @@ export function ChatShell() {
     [activeId, userId, workspaces],
   );
 
-  const handleNew = useCallback(() => setActiveId(null), []);
+  const handleNew = useCallback(() => {
+    setActiveId(null);
+    setLiveSessionId(null);
+  }, []);
 
   const handleSelect = useCallback(
     (sessionId: string) => {
       setActiveId(sessionId);
+      setLiveSessionId(sessionId);
       if (userId) {
         setSessions((previous) => upsertSession(previous, userId, sessionId));
       }
@@ -131,6 +142,7 @@ export function ChatShell() {
         setSessions((previous) => removeSession(previous, userId, sessionId));
       }
       setActiveId((current) => (current === sessionId ? null : current));
+      setLiveSessionId((current) => (current === sessionId ? null : current));
     },
     [userId],
   );
@@ -159,7 +171,10 @@ export function ChatShell() {
   const handleSelectWorkspace = useCallback(
     (selected: WorkspaceRecord | null) => {
       setActiveWorkspace(selected);
-      if (!selected) return;
+      if (!selected) {
+        setLiveSessionId(null);
+        return;
+      }
       // Pair the execution target with the workspace kind (overridable after).
       if (selected.provider === "host") {
         setWorkspace("local");
@@ -176,6 +191,7 @@ export function ChatShell() {
             );
           }
           setActiveId(sessionId);
+          setLiveSessionId(sessionId);
         }
       }
     },
@@ -222,7 +238,7 @@ export function ChatShell() {
       }
     >
       <ChatSidebar
-        activeId={activeId}
+        activeId={liveSessionId ?? activeId}
         activeWorkspaceId={activeWorkspace?.id ?? null}
         onDelete={handleDelete}
         onDeleteWorkspace={(id) => {
