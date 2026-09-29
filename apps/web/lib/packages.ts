@@ -20,7 +20,7 @@ export const PACKAGE_CATALOG: readonly CatalogPackage[] = [
     description: "Modern typesetting for PDFs and documents",
     check: "typst",
     install:
-      "mkdir -p ~/.local/bin && curl -LsSf https://github.com/typst/typst/releases/latest/download/typst-x86_64-unknown-linux-musl.tar.xz | tar -xJ -C ~/.local/bin --strip-components=1 && export PATH=\"$HOME/.local/bin:$PATH\"",
+      "sudo apt-get update -qq && sudo apt-get install -y -qq xz-utils curl ca-certificates && mkdir -p ~/.local/bin && curl --http1.1 -LsSf https://github.com/typst/typst/releases/latest/download/typst-x86_64-unknown-linux-musl.tar.xz | tar -xJ -C ~/.local/bin --strip-components=1 && export PATH=\"$HOME/.local/bin:$PATH\"",
   },
   {
     id: "pandoc",
@@ -56,7 +56,7 @@ export const PACKAGE_CATALOG: readonly CatalogPackage[] = [
     description: "YAML/TOML processor (mikefarah build)",
     check: "yq",
     install:
-      "sudo curl -LsSf https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && sudo chmod +x /usr/local/bin/yq",
+      "sudo curl --http1.1 -LsSf https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && sudo chmod +x /usr/local/bin/yq",
   },
   {
     id: "gh",
