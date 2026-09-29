@@ -1,16 +1,44 @@
 "use client";
 
-import { ContainerIcon, FolderPlusIcon, LaptopIcon, LayersIcon } from "lucide-react";
+import { CheckIcon, ContainerIcon, FolderPlusIcon, LaptopIcon, LayersIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { WorkspaceRecord } from "@/lib/workspaces";
 import { cn } from "@/lib/utils";
+
+/** Menu row with a right-side tick instead of the radio dot. */
+function WorkspacePickerItem({
+  description,
+  icon,
+  onSelect,
+  selected,
+  title,
+}: {
+  readonly description: string;
+  readonly icon?: ReactNode;
+  readonly onSelect: () => void;
+  readonly selected: boolean;
+  readonly title: string;
+}) {
+  return (
+    <DropdownMenuItem onSelect={onSelect}>
+      <span className="flex min-w-0 flex-1 items-start gap-2 py-0.5">
+        {icon}
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+          <span className="text-xs">{title}</span>
+          <span className="text-muted-foreground text-[11px]">{description}</span>
+        </span>
+      </span>
+      {selected ? <CheckIcon className="size-4 shrink-0" /> : null}
+    </DropdownMenuItem>
+  );
+}
 
 /**
  * Named-workspace picker for the composer. Lists the workspaces the user
@@ -52,42 +80,25 @@ export function WorkspacePicker({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top">
-        <DropdownMenuRadioGroup
-          onValueChange={(next) => {
-            if (next === "") {
-              onChange(null);
-              return;
-            }
-            const found = workspaces.find((entry) => entry.id === next);
-            if (found) onChange(found);
-          }}
-          value={value?.id ?? ""}
-        >
-          <DropdownMenuRadioItem value="">
-            <span className="flex flex-col items-start gap-0.5 py-0.5">
-              <span className="text-xs">No workspace</span>
-              <span className="text-muted-foreground text-[11px]">
-                Default VM behavior
-              </span>
-            </span>
-          </DropdownMenuRadioItem>
-          {workspaces.map((workspace) => {
-            const OptionIcon = workspace.provider === "host" ? LaptopIcon : ContainerIcon;
-            return (
-              <DropdownMenuRadioItem key={workspace.id} value={workspace.id}>
-                <span className="flex items-start gap-2 py-0.5">
-                  <OptionIcon className="mt-0.5 size-3.5 shrink-0" />
-                  <span className="flex flex-col items-start gap-0.5">
-                    <span className="text-xs">{workspace.name}</span>
-                    <span className="text-muted-foreground text-[11px]">
-                      {workspace.provider === "host" ? "Host directory" : "MicroVM"}
-                    </span>
-                  </span>
-                </span>
-              </DropdownMenuRadioItem>
-            );
-          })}
-        </DropdownMenuRadioGroup>
+        <WorkspacePickerItem
+          description="Default VM behavior"
+          onSelect={() => onChange(null)}
+          selected={value === null}
+          title="No workspace"
+        />
+        {workspaces.map((workspace) => {
+          const OptionIcon = workspace.provider === "host" ? LaptopIcon : ContainerIcon;
+          return (
+            <WorkspacePickerItem
+              key={workspace.id}
+              description={workspace.provider === "host" ? "Host directory" : "MicroVM"}
+              icon={<OptionIcon className="mt-0.5 size-3.5 shrink-0" />}
+              onSelect={() => onChange(workspace)}
+              selected={value?.id === workspace.id}
+              title={workspace.name}
+            />
+          );
+        })}
         <DropdownMenuSeparator />
         <button
           className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs outline-none hover:bg-accent focus-visible:bg-accent"
