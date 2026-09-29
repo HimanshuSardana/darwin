@@ -49,24 +49,29 @@ export function ChatSidebar({
   onDelete,
   onDeleteWorkspace,
   onNew,
-  onNewWorkspace,
   onSelect,
   onSelectWorkspace,
   sessions,
   workspaces,
+  workspaceDialogOpen,
+  onWorkspaceDialogChange,
+  onWorkspaceDialogSubmit,
 }: {
   readonly activeId: string | null;
   readonly activeWorkspaceId: string | null;
   readonly onDelete: (sessionId: string) => void;
   readonly onDeleteWorkspace: (id: string) => void;
   readonly onNew: () => void;
-  readonly onNewWorkspace: (
-    input: { name: string; provider: WorkspaceProvider },
-  ) => Promise<void>;
   readonly onSelect: (sessionId: string) => void;
   readonly onSelectWorkspace: (workspace: WorkspaceRecord | null) => void;
   readonly sessions: readonly ChatSessionEntry[];
   readonly workspaces: readonly WorkspaceRecord[];
+  readonly workspaceDialogOpen: boolean;
+  readonly onWorkspaceDialogChange: (open: boolean) => void;
+  readonly onWorkspaceDialogSubmit: (input: {
+    name: string;
+    provider: WorkspaceProvider;
+  }) => Promise<void>;
 }) {
   // On mobile the sidebar is a Sheet overlay (separate openMobile state
   // inside the provider). Dismiss it when the user picks a destination;
@@ -79,7 +84,6 @@ export function ChatSidebar({
     authSession?.user?.email?.split("@")[0] ||
     "User";
   const userEmail = authSession?.user?.email ?? "";
-  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [workspaceDialogPending, setWorkspaceDialogPending] = useState(false);
   const [workspaceDialogError, setWorkspaceDialogError] = useState<string | null>(null);
   const router = useRouter();
@@ -128,7 +132,7 @@ export function ChatSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
           <SidebarGroupAction
-            onClick={() => setWorkspaceDialogOpen(true)}
+            onClick={() => onWorkspaceDialogChange(true)}
             title="Spin up workspace"
           >
             <PlusIcon />
@@ -245,15 +249,15 @@ export function ChatSidebar({
       <WorkspaceDialog
         error={workspaceDialogError}
         onOpenChange={(open) => {
-          setWorkspaceDialogOpen(open);
+          onWorkspaceDialogChange(open);
           if (open) setWorkspaceDialogError(null);
         }}
         onSubmit={async (input) => {
           setWorkspaceDialogPending(true);
           setWorkspaceDialogError(null);
           try {
-            await onNewWorkspace(input);
-            setWorkspaceDialogOpen(false);
+            await onWorkspaceDialogSubmit(input);
+            onWorkspaceDialogChange(false);
           } catch (error) {
             setWorkspaceDialogError(
               error instanceof Error ? error.message : "Could not spin up workspace.",

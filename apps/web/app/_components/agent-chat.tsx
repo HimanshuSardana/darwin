@@ -32,7 +32,8 @@ import { SlashMenu } from "@/components/slash-menu";
 import { matchSlashCommands, parseSlashCommand } from "@/lib/slash-commands";
 import { PlanTodos, parsePlanTodos } from "@/components/plan-todos";
 import { ReasoningSelect } from "@/components/reasoning-select";
-import { WorkspaceSelect } from "@/components/workspace-select";
+import { WorkspacePicker } from "@/components/workspace-picker";
+import type { WorkspaceRecord } from "@/lib/workspaces";
 import { modeClientContext, type Mode } from "@/lib/mode";
 import {
   reasoningClientContext,
@@ -56,7 +57,10 @@ export function AgentChat({
   reasoningEffort = "provider-default",
   reasoningOnChange,
   workspace = "vm",
-  workspaceOnChange,
+  namedWorkspaces,
+  activeNamedWorkspace,
+  onPickNamedWorkspace,
+  onNewNamedWorkspace,
   mode = "build",
   modeOnChange,
   namedWorkspaceContext,
@@ -77,7 +81,11 @@ export function AgentChat({
   readonly reasoningOnChange?: (effort: ReasoningEffort) => void;
   /** Composer workspace; sent as ephemeral turn context. */
   readonly workspace?: Workspace;
-  readonly workspaceOnChange?: (workspace: Workspace) => void;
+  /** Named workspaces for the composer picker (replaces the vm/host toggle). */
+  readonly namedWorkspaces?: readonly WorkspaceRecord[];
+  readonly activeNamedWorkspace?: WorkspaceRecord | null;
+  readonly onPickNamedWorkspace?: (workspace: WorkspaceRecord | null) => void;
+  readonly onNewNamedWorkspace?: () => void;
   /** Composer plan/build mode; sent first as ephemeral turn context. */
   readonly mode?: Mode;
   readonly modeOnChange?: (mode: Mode) => void;
@@ -467,8 +475,13 @@ export function AgentChat({
           {modeOnChange ? (
             <ModeSelect onChange={modeOnChange} value={mode} />
           ) : null}
-          {workspaceOnChange ? (
-            <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
+          {namedWorkspaces && onPickNamedWorkspace && onNewNamedWorkspace ? (
+            <WorkspacePicker
+              onChange={onPickNamedWorkspace}
+              onNew={onNewNamedWorkspace}
+              value={activeNamedWorkspace ?? null}
+              workspaces={namedWorkspaces}
+            />
           ) : null}
           {reasoningOnChange ? (
             <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />

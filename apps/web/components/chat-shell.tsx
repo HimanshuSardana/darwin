@@ -58,6 +58,7 @@ export function ChatShell() {
   const [mode, setMode] = useState<Mode>(loadMode);
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceRecord | null>(null);
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
 
   // Per-user session registry: load this user's list, claim each server-side
   // (first writer wins), and drop anything owned by someone else — e.g.
@@ -152,11 +153,6 @@ export function ChatShell() {
     saveReasoningEffort(effort);
   }, []);
 
-  const handleWorkspaceChange = useCallback((next: Workspace) => {
-    setWorkspace(next);
-    saveWorkspace(next);
-  }, []);
-
   const handleModeChange = useCallback((next: Mode) => {
     setMode(next);
     saveMode(next);
@@ -245,11 +241,13 @@ export function ChatShell() {
           handleDeleteWorkspace(id).catch(() => {});
         }}
         onNew={handleNew}
-        onNewWorkspace={handleNewWorkspace}
         onSelect={handleSelect}
         onSelectWorkspace={handleSelectWorkspace}
+        onWorkspaceDialogChange={setWorkspaceDialogOpen}
+        onWorkspaceDialogSubmit={handleNewWorkspace}
         sessions={sessions}
         workspaces={workspaces}
+        workspaceDialogOpen={workspaceDialogOpen}
       />
       <SidebarInset>
         <MotionConfig reducedMotion="user">
@@ -273,7 +271,10 @@ export function ChatShell() {
           reasoningEffort={reasoningEffort}
           reasoningOnChange={handleReasoningChange}
           workspace={workspace}
-          workspaceOnChange={handleWorkspaceChange}
+          namedWorkspaces={workspaces}
+          activeNamedWorkspace={activeWorkspace}
+          onPickNamedWorkspace={handleSelectWorkspace}
+          onNewNamedWorkspace={() => setWorkspaceDialogOpen(true)}
           mode={mode}
           modeOnChange={handleModeChange}
           namedWorkspaceContext={namedWorkspaceClientContext(activeWorkspace)}
