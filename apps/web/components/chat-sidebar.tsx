@@ -205,7 +205,7 @@ export function ChatSidebar({
                       <span className="min-w-0 flex-1 truncate font-normal text-sm">
                         {session.title}
                       </span>
-                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                      <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-hover/menu-item:invisible">
                         {relativeTime(session.updatedAt)}
                       </span>
                     </SidebarMenuButton>
