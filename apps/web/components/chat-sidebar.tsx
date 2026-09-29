@@ -144,6 +144,7 @@ export function ChatSidebar({
                     <SidebarMenuItem key={workspaceRecord.id}>
                       <SidebarMenuButton
                         isActive={workspaceRecord.id === activeWorkspaceId}
+                        className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                         onClick={() => {
                           dismissMobileSheet();
                           onSelectWorkspace(
@@ -201,6 +202,7 @@ export function ChatSidebar({
                       isActive={session.sessionId === activeId}
                       onClick={() => handleSelect(session.sessionId)}
                       tooltip={session.title}
+                      className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-has-data-[sidebar=menu-action]/menu-item:pr-2"
                     >
                       <span className="min-w-0 flex-1 truncate font-normal text-sm">
                         {session.title}
