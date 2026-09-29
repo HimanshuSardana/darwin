@@ -30,8 +30,7 @@ export function BrowserPanel({
   readonly streamFrame: string | null;
   readonly url: string | null;
 }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
 
   const onPointerDown = (event: React.PointerEvent) => {
@@ -60,7 +59,9 @@ export function BrowserPanel({
   const window_ = (
     <div
       ref={frameRef}
-      style={pos ? { left: pos.x, top: pos.y } : { top: 72, right: 16 }}
+      // Fullscreen ignores drag position entirely: any leftover left/top
+      // inline style would beat inset-0 and pin the window off-origin.
+      style={fullscreen ? undefined : pos ? { left: pos.x, top: pos.y } : { top: 72, right: 16 }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
