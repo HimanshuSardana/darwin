@@ -470,16 +470,12 @@ export function AgentChat({
         />
       ) : null}
 
-      {embedded ? (
-        <div className="flex min-h-0 flex-1 flex-row">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {conversationView}
-            {composerView}
-          </div>
-          {browserOpen ? (
-            <BrowserPanel
-              fullscreen={browserFullscreen}
-              live={browserStream.live}
+      {conversationView}
+      {composerView}
+      {embedded && browserOpen ? (
+        <BrowserPanel
+          fullscreen={browserFullscreen}
+          live={browserStream.live}
               onClose={() => {
                 setBrowserOpen(false);
                 setBrowserFullscreen(false);
@@ -491,13 +487,6 @@ export function AgentChat({
               url={browserStream.url}
             />
           ) : null}
-        </div>
-      ) : (
-        <>
-          {conversationView}
-          {composerView}
-        </>
-      )}
     </main>
   );
 }
