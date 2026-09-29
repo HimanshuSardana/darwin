@@ -105,13 +105,13 @@ footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem
 @view-transition{navigation:auto}
 ::view-transition-old(root){animation:vt-fade-out .28s ease both}
 ::view-transition-new(root){animation:vt-fade-in .28s ease both}
-@keyframes vt-fade-out{from{opacity:1}to{opacity:0}}
-@keyframes vt-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes vt-fade-out{to{opacity:0}}
+@keyframes vt-fade-in{from{opacity:0}}
 html[data-vt-nav="traverse"]::view-transition-old(root){animation:vt-back-out .38s cubic-bezier(.3,.7,.3,1) both}
-@keyframes vt-back-out{from{transform:translateX(0)}to{transform:translateX(-72px)}}
+@keyframes vt-back-out{to{opacity:0;transform:translateX(-72px)}}
 html[data-vt="theme"]::view-transition-old(root),html[data-vt="theme"]::view-transition-new(root){animation:none;mix-blend-mode:normal}
 html[data-vt="theme"]::view-transition-new(root){z-index:2;clip-path:circle(0 at var(--vt-x) var(--vt-y));animation:vt-circle .6s cubic-bezier(.3,.7,.3,1) forwards}
-@keyframes vt-circle{from{clip-path:circle(0 at var(--vt-x) var(--vt-y))}to{clip-path:circle(var(--vt-r) at var(--vt-x) var(--vt-y))}}
+@keyframes vt-circle{to{clip-path:circle(var(--vt-r) at var(--vt-x) var(--vt-y))}}
 .rise{animation:vt-rise .65s cubic-bezier(.2,.7,.2,1) both}
 html.from-vt .rise{animation:none}
 @keyframes vt-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
@@ -187,7 +187,7 @@ html.traverse .prose{animation:vt-doc-back .4s cubic-bezier(.3,.7,.3,1) backward
       root.style.setProperty('--vt-r', Math.ceil(r) + 'px');
       root.dataset.vt = 'theme';
       var t = document.startViewTransition(flip);
-      if (t && t.finished) t.finished.then(function(){ delete root.dataset.vt; });
+      if (t && t.finished) t.finished.then(function(){ delete root.dataset.vt; }, function(){ delete root.dataset.vt; });
     } else { flip(); }
   });
 })();
