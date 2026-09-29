@@ -213,10 +213,23 @@ export function AgentChat({
     () => (slashDismissed ? [] : matchSlashCommands(composerText)),
     [composerText, slashDismissed],
   );
+  useEffect(() => {
+    if (agent.status !== "submitted") {
+      setPendingSend(null);
+    }
+  }, [agent.status]);
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = !isEmpty || errorMessage !== undefined;
-  const showConversationLayout = isResuming || hasConversationContent;
+  // Optimistic send state: jump to the chat view immediately on submit,
+  // showing the message muted + shimmering until the server confirms it.
+  // Cleared once the status leaves "submitted" (streaming/error) or the
+  // transcript grows past what_submit saw (covers optimistic projection).
+  const [pendingSend, setPendingSend] = useState<string | null>(null);
+  const messageCountAtSubmitRef = useRef(0);
+  const showSyntheticSend =
+    pendingSend !== null && agent.data.messages.length <= messageCountAtSubmitRef.current;
+  const showConversationLayout = isResuming || hasConversationContent || showSyntheticSend;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
 
   const requestCancellation = () => {
@@ -296,6 +309,12 @@ export function AgentChat({
       titledSessionRef.current = sessionId ?? "new";
       onFirstMessageRef.current?.(text);
     }
+    // Arm the optimistic sending state *after* slash handling, right before
+    // the turn actually dispatches (bare mode-switches return early above).
+    messageCountAtSubmitRef.current = agent.data.messages.length;
+    if (text.length > 0) {
+      setPendingSend(text);
+    }
 
     if (message.files.length === 0) {
       await agent.send(text, options);
@@ -360,6 +379,23 @@ export function AgentChat({
                 />
               ),
             )}
+            {showSyntheticSend && pendingSend ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="flex justify-end"
+              >
+                <div className="flex max-w-[85%] flex-col items-end gap-1">
+                  <div className="bg-muted text-muted-foreground rounded-2xl rounded-br-md px-4 py-2.5 text-sm whitespace-pre-wrap">
+                    {pendingSend}
+                  </div>
+                  <div className="text-muted-foreground pr-1 text-xs">
+                    <Shimmer duration={1.2}>Sending…</Shimmer>
+                  </div>
+                </div>
+              </motion.div>
+            ) : null}
             {showPendingThinking ? <PendingThinking /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
