@@ -49,7 +49,7 @@ code{font-family:'Iosevka',ui-monospace,SFMono-Regular,Menlo,monospace;font-size
 .car-viewport{position:relative;overflow:hidden}
 .car-track{display:flex;transition:transform .45s cubic-bezier(.3,.7,.3,1)}
 .car-slide{flex:0 0 100%;min-width:0;margin:0}
-.car-slide img{display:block;width:100%;height:auto}
+.car-slide img{display:block;width:100%;height:auto;cursor:zoom-in}
 .carousel .only-light{display:none}
 [data-theme="light"] .only-light{display:block}
 [data-theme="light"] .only-dark{display:none}
@@ -60,8 +60,20 @@ code{font-family:'Iosevka',ui-monospace,SFMono-Regular,Menlo,monospace;font-size
 .car-bar{display:flex;align-items:center;gap:.8rem;padding:.1rem .25rem;margin-bottom:1rem}
 .car-caption{margin:0;font-size:.78rem;color:var(--faint);flex:1;min-width:0}
 .car-dots{display:flex;gap:.45rem;flex-shrink:0}
-.car-dots button{width:.55rem;height:.55rem;border-radius:99px;border:1px solid var(--faint);background:transparent;cursor:pointer;padding:0}
-.car-dots button.on{background:var(--text);border-color:var(--text)}
+.car-dots button{width:.55rem;height:.55rem;border-radius:99px;border:0;background:var(--faint);opacity:.45;cursor:pointer;padding:0;transition:width .25s ease,opacity .25s ease,background .25s ease}
+.car-dots button.on{width:1.3rem;background:var(--text);opacity:1}
+.lb-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);z-index:300;display:none}
+.lb-backdrop.open{display:block}
+.lb{position:fixed;inset:0;z-index:301;display:none;align-items:center;justify-content:center;padding:4rem 1rem 3rem}
+.lb.open{display:flex}
+.lb img{max-width:min(1100px,94vw);max-height:100%;border-radius:12px;border:1px solid #2e2e33}
+.lb-btn{position:fixed;width:2.4rem;height:2.4rem;border-radius:99px;border:1px solid #3f3f46;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.lb-btn:hover{border-color:#71717a}
+.lb-close{top:1rem;right:1rem}
+.lb-prev{left:1rem;top:50%;transform:translateY(-50%)}
+.lb-next{right:1rem;top:50%;transform:translateY(-50%)}
+.lb-count{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);font-size:.78rem;color:#a1a1aa;margin:0}
+@media(max-width:640px){.lb-prev{left:.4rem}.lb-next{right:.4rem}}
 /* sections */
 .sec-label{font-size:.85rem;color:var(--muted);margin:2.8rem 0 .8rem}
 .feat-list{list-style:none}
@@ -299,6 +311,15 @@ window.addEventListener('pagereveal', function(e){
 document.addEventListener('DOMContentLoaded', markNav);
 </script>
 
+<div class="lb-backdrop" id="lb-backdrop"></div>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+<img id="lb-img" alt="Screenshot" />
+<button class="lb-btn lb-close" id="lb-close" aria-label="Close viewer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+<button class="lb-btn lb-prev" id="lb-prev" aria-label="Previous screenshot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+<button class="lb-btn lb-next" id="lb-next" aria-label="Next screenshot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+<p class="lb-count" id="lb-count">1 / 3</p>
+</div>
+
 <div class="cmdk-backdrop" id="cmdk-backdrop"></div>
 <div class="cmdk" id="cmdk" role="dialog" aria-modal="true" aria-label="Search">
 <input class="cmdk-input" id="cmdk-input" type="text" placeholder="Search pages…" autocomplete="off" spellcheck="false" />
@@ -477,6 +498,53 @@ window.__cmdkSections = [];
     tx = null;
     if (Math.abs(dx) > 40) go(i + (dx < 0 ? 1 : -1));
   }, { passive: true });
+  var lb = document.getElementById('lb');
+  var lbDrop = document.getElementById('lb-backdrop');
+  var lbImg = document.getElementById('lb-img');
+  var lbCount = document.getElementById('lb-count');
+  function lbSrc(k){
+    var s = track.children[k];
+    if (!s) return '';
+    var light = document.documentElement.getAttribute('data-theme') === 'light';
+    var el = s.querySelector(light ? '.only-light' : '.only-dark');
+    return el ? el.getAttribute('src') : '';
+  }
+  function lbShow(k){
+    i = (k + n) % n;
+    render();
+    lbImg.setAttribute('src', lbSrc(i));
+    lbImg.setAttribute('alt', captions[i] || 'Screenshot');
+    lbCount.textContent = (i + 1) + ' / ' + n;
+  }
+  function lbOpen(){
+    lbShow(i);
+    lb.classList.add('open');
+    lbDrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    if (timer) { clearInterval(timer); timer = null; }
+    document.getElementById('lb-close').focus();
+  }
+  function lbClose(){
+    lb.classList.remove('open');
+    lbDrop.classList.remove('open');
+    document.body.style.overflow = '';
+    restart();
+  }
+  Array.prototype.forEach.call(track.querySelectorAll('.car-slide img'), function(img){
+    img.addEventListener('click', lbOpen);
+  });
+  document.getElementById('lb-close').addEventListener('click', lbClose);
+  lbDrop.addEventListener('click', lbClose);
+  lb.addEventListener('click', function(e){ if (e.target === lb) lbClose(); });
+  document.getElementById('lb-prev').addEventListener('click', function(e){ e.stopPropagation(); lbShow(i - 1); });
+  document.getElementById('lb-next').addEventListener('click', function(e){ e.stopPropagation(); lbShow(i + 1); });
+  document.addEventListener('keydown', function(e){
+    if (!lb.classList.contains('open')) return;
+    if (e.key === 'Escape') lbClose();
+    else if (e.key === 'ArrowLeft') lbShow(i - 1);
+    else if (e.key === 'ArrowRight') lbShow(i + 1);
+  });
+  new MutationObserver(function(){ if (lb.classList.contains('open')) lbShow(i); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   render();
   restart();
 })();
