@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="darwin — a self-hosted agent app built on eve. A microVM workspace, a real browser the agent drives while you watch, and a Next.js chat UI you host yourself." />
+<meta name="description" content="darwin is a self-hosted agent app built on eve. A microVM workspace, a real browser the agent drives while you watch, and a Next.js chat UI you host yourself." />
 <title>{{ .SiteTitle }}</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/iosevka@latest/400.css" rel="stylesheet" />
@@ -120,7 +120,7 @@ html.js .rv.in{opacity:1;transform:none}
 <div class="wrap">
 <h1 class="tagline-title rise rise-1">Give your agent a computer.</h1>
 
-<p class="lede rise rise-2">darwin is a self-hosted agent app built on <a href="https://eve.dev" target="_blank" rel="noreferrer">eve</a> — the agent works inside its own microVM, drives a real browser you can watch live, and ships with a streaming chat UI you host yourself.</p>
+<p class="lede rise rise-2">darwin is a self-hosted agent app built on <a href="https://eve.dev" target="_blank" rel="noreferrer">eve</a>. The agent works inside its own microVM, drives a real browser you can watch live, and ships with a streaming chat UI you host yourself.</p>
 
 <div class="btn-row rise rise-3">
 <a class="btn btn-solid" href="https://github.com/HimanshuSardana/darwin" target="_blank" rel="noreferrer">
@@ -131,28 +131,25 @@ View on GitHub</a>
 
 <div class="sec-label" id="features">What you get</div>
 <ul class="feat-list">
-<li><b>microVM workspace</b>: every built-in shell command runs in an isolated lightweight VM rooted at <code>/workspace</code> — nothing it does touches your machine</li>
+<li><b>microVM workspace</b>: every built-in shell command runs in an isolated lightweight VM rooted at <code>/workspace</code>, so nothing it does touches your machine</li>
 <li><b>Live browser</b>: the agent drives a real Chromium on your desktop and you watch it stream into a floating panel inside the chat</li>
-<li><b>Plan / build modes</b>: planning turns are read-only by tool allowlist — <code>bash</code> and <code>write_file</code> literally aren't callable — then build turns work the plan</li>
+<li><b>Plan / build modes</b>: planning turns are read-only by tool allowlist (<code>bash</code> and <code>write_file</code> literally aren't callable), then build turns work the plan</li>
 <li><b>Two workspaces, one agent</b>: flip between the sandboxed VM and your host machine; host commands pause and wait for your approval</li>
 <li><b>Skills &amp; slash commands</b>: <code>/grill</code> interrogates your task before a line of code exists, and skills load on demand</li>
-<li><b>Bring your own model</b>: any OpenAI-compatible gateway — darwin ships wired to OpenCode Go's Responses API with a 200k context window</li>
-<li><b>Chat app included</b>: streaming chat, sessions, workspaces and sign-in — a Next.js app in <code>apps/web</code></li>
+<li><b>Bring your own model</b>: any OpenAI-compatible gateway; darwin ships wired to OpenCode Go's Responses API with a 200k context window</li>
+<li><b>Chat app included</b>: streaming chat, sessions, workspaces and sign-in, all in a Next.js app in <code>apps/web</code></li>
 <li><b>Deploys to Vercel</b>: <code>eve deploy</code> links the project and ships the agent</li>
 </ul>
 
 <div class="sec-label" id="how">How it works</div>
-<p class="lede" style="margin-bottom:1rem">Two halves, one repo. The agent is a directory of files under <code>agent/</code> — instructions, tools, skills, sandbox config — that eve compiles and runs. The app is a normal Next.js project that talks to it over eve's channel auth and streams tokens back to the browser.</p>
-<div class="cmd-box"><span class="c"># darwin at a glance</span>
-you ──▶ apps/web <span class="c">(Next.js chat UI · auth · sessions)</span>
-          │  stream
-          ▼
-       eve channel ──▶ agent/ <span class="c">(eve: instructions · tools · skills)</span>
-                          │
-        ┌─────────────────┼──────────────────────┐
-        ▼                 ▼                      ▼
-  microVM /workspace   host Chromium      approval-gated host
-  bash · read · write  live-streamed      local_bash · export_file</div>
+<p class="lede" style="margin-bottom:1rem">Two halves, one repo: a Next.js app you talk to, and an eve agent that does the work.</p>
+<ul class="feat-list">
+<li><b>The app</b>: <code>apps/web</code> is a normal Next.js project with the chat UI, auth, sessions and workspaces. Your message reaches the agent over eve's channel auth (Vercel OIDC in production, open on localhost).</li>
+<li><b>The agent</b>: <code>agent/</code> is a directory of plain files (instructions, tools, skills, sandbox config) that eve compiles and runs.</li>
+<li><b>Execution</b>: built-in shell and file tools run inside the microVM rooted at <code>/workspace</code>. Switching the workspace to "this machine" runs them on the host instead, and every call pauses for your approval.</li>
+<li><b>Browser</b>: when a task needs the web, the agent drives a real Chromium on the host through snapshot references, and screenshots stream back into the floating panel over an internal API.</li>
+<li><b>Streaming back</b>: tokens flow through the channel to the browser, so the message renders as it is generated.</li>
+</ul>
 
 <div class="sec-label" id="quickstart">Quickstart</div>
 <div class="cmd-box"><span class="c"># clone and install</span>
@@ -167,17 +164,17 @@ you ──▶ apps/web <span class="c">(Next.js chat UI · auth · sessions)</sp
 <div class="sec-label" id="writing">Writing</div>
 <ul class="feat-list">
 {{ range .Posts }}
-<li data-cmd-item data-title="{{ .Title }}" data-tags="{{ range .Tags }}{{ . }} {{ end }}" data-href="{{ .Slug }}/"><b>{{ .Title }}</b>{{ range .Tags }} · {{ . }}{{ end }} — <a href="{{ .Slug }}/">read</a></li>
+<li data-cmd-item data-title="{{ .Title }}" data-tags="{{ range .Tags }}{{ . }} {{ end }}" data-href="{{ .Slug }}/"><b>{{ .Title }}</b>{{ range .Tags }} · {{ . }}{{ end }} · <a href="{{ .Slug }}/">read</a></li>
 {{ end }}
 </ul>
 {{ end }}
 
 <div class="sec-label" id="faq">FAQ</div>
 <div class="faq">
-<div class="qa"><p class="q">What exactly is darwin?</p><p>An agent app: an <a href="https://eve.dev" target="_blank" rel="noreferrer">eve</a> agent (instructions, tools, skills, sandbox — all plain files) plus a Next.js chat frontend. You can read the whole thing on <a href="https://github.com/HimanshuSardana/darwin" target="_blank" rel="noreferrer">GitHub</a>.</p></div>
-<div class="qa"><p class="q">Does the agent touch my machine?</p><p>Not by default. Built-in shell and file tools run inside the microVM. Tools that do reach the host — <code>local_bash</code>, <code>local_write</code> — pause and wait for your approval first, and browser clicks and fills are approved once per session.</p></div>
+<div class="qa"><p class="q">What exactly is darwin?</p><p>An agent app: an <a href="https://eve.dev" target="_blank" rel="noreferrer">eve</a> agent (instructions, tools, skills and sandbox, all plain files) plus a Next.js chat frontend. You can read the whole thing on <a href="https://github.com/HimanshuSardana/darwin" target="_blank" rel="noreferrer">GitHub</a>.</p></div>
+<div class="qa"><p class="q">Does the agent touch my machine?</p><p>Not by default. Built-in shell and file tools run inside the microVM. Tools that do reach the host (<code>local_bash</code>, <code>local_write</code>) pause and wait for your approval first, and browser clicks and fills are approved once per session.</p></div>
 <div class="qa"><p class="q">How does the browser panel work?</p><p>Chromium runs on the host (so the window is real and visible), driven through snapshot references rather than raw DOM. Screenshots stream over an internal API into a floating, draggable, fullscreenable panel in the chat.</p></div>
-<div class="qa"><p class="q">Which model does it use?</p><p>Whatever OpenAI-compatible endpoint you point it at. The default is OpenCode Go's gateway, called through the Responses API — swap the provider in a few lines of <code>agent/agent.ts</code>.</p></div>
+<div class="qa"><p class="q">Which model does it use?</p><p>Whatever OpenAI-compatible endpoint you point it at. The default is OpenCode Go's gateway, called through the Responses API; swapping providers is a few lines of <code>agent/agent.ts</code>.</p></div>
 <div class="qa"><p class="q">Where does it run?</p><p>Locally with <code>eve dev</code>, deployed to Vercel with <code>eve deploy</code>. The web app is a standard Next.js project, so it hosts anywhere Next does.</p></div>
 </div>
 
