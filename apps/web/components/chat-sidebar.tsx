@@ -1,6 +1,6 @@
 "use client";
 
-import { ContainerIcon, LaptopIcon, LogOutIcon, MessageSquareTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
+import { BotIcon, ContainerIcon, LaptopIcon, MessageSquareTextIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,7 +23,8 @@ import type { WorkspaceProvider } from "@/components/workspace-dialog";
 import type { WorkspaceRecord } from "@/lib/workspaces";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useSession } from "@/lib/auth-client";
+import { NavUser } from "@/components/nav-user";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { WorkspaceDialog } from "@/components/workspace-dialog";
 
@@ -69,6 +70,12 @@ export function ChatSidebar({
   // on desktop this is a no-op.
   const { isMobile, setOpenMobile } = useSidebar();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { data: authSession } = useSession();
+  const userName =
+    authSession?.user?.name?.trim() ||
+    authSession?.user?.email?.split("@")[0] ||
+    "User";
+  const userEmail = authSession?.user?.email ?? "";
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [workspaceDialogPending, setWorkspaceDialogPending] = useState(false);
   const [workspaceDialogError, setWorkspaceDialogError] = useState<string | null>(null);
@@ -97,12 +104,22 @@ export function ChatSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-1">
-          <SidebarTrigger />
-          <span className="flex-1 truncate px-1 font-medium text-sm tracking-tight group-data-[collapsible=icon]:hidden">
-            Chats
-          </span>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <div className="flex items-center gap-1">
+              <SidebarMenuButton size="lg" tooltip="darwin">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+                  <BotIcon className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">darwin</span>
+                  <span className="truncate text-xs">Agent harness</span>
+                </div>
+              </SidebarMenuButton>
+              <SidebarTrigger className="shrink-0" />
+            </div>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -211,23 +228,15 @@ export function ChatSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => setSettingsOpen(true)} tooltip="Settings">
-              <SettingsIcon />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={signOut} tooltip="Sign out">
-              <LogOutIcon />
-              <span>Sign out</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-        <p className="text-muted-foreground px-2 py-1 text-[11px] group-data-[collapsible=icon]:hidden">
-          Conversations persist on the agent; the list lives in this browser.
-        </p>
+        <NavUser
+          email={userEmail}
+          name={userName}
+          onSettings={() => {
+            dismissMobileSheet();
+            setSettingsOpen(true);
+          }}
+          onSignOut={signOut}
+        />
       </SidebarFooter>
       <SidebarRail />
       <SettingsDialog onOpenChange={setSettingsOpen} open={settingsOpen} />
