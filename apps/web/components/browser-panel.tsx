@@ -29,9 +29,9 @@ export function BrowserPanel({
     <div
       className={cn(
         "flex flex-col overflow-hidden bg-background",
-        fullscreen
-          ? "fixed inset-0 z-50"
-          : "h-full min-h-0 w-[420px] shrink-0 border-l xl:w-[520px]",
+        // Inside the resizable group the pane fills its slot; fullscreen
+        // escapes layout as an overlay.
+        fullscreen ? "fixed inset-0 z-50" : "h-full min-h-0 w-full border-l",
       )}
     >
       <div className="flex h-14 shrink-0 items-center gap-1 border-b px-3">
@@ -64,14 +64,27 @@ export function BrowserPanel({
           <XIcon className="size-4" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto bg-muted/30 p-3">
+      <div className="min-h-0 flex-1 overflow-hidden bg-muted/30 p-3">
         {src ? (
-          <img
-            alt={live ? "Live browser view" : "Last browser screenshot"}
-            className="h-auto w-full rounded-lg border bg-background shadow-sm"
-            key={live ? "live" : src}
-            src={src}
-          />
+          live ? (
+            // Live view never scrolls: contain the frame in the pane.
+            <div className="flex h-full items-center justify-center">
+              <img
+                alt="Live browser view"
+                className="max-h-full max-w-full rounded-lg border bg-background object-contain shadow-sm"
+                src={src}
+              />
+            </div>
+          ) : (
+            <div className="h-full overflow-auto">
+              <img
+                alt="Last browser screenshot"
+                className="h-auto w-full rounded-lg border bg-background shadow-sm"
+                key={src}
+                src={src}
+              />
+            </div>
+          )
         ) : (
           <div className="flex h-full min-h-48 flex-col items-center justify-center gap-2 text-center">
             <MonitorIcon className="text-muted-foreground size-8" />
