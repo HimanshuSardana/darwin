@@ -214,7 +214,7 @@ View on GitHub</a>
       var x = (e && e.clientX != null) ? e.clientX : window.innerWidth / 2;
       var y = (e && e.clientY != null) ? e.clientY : 0;
       var root = document.documentElement;
-      var r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+      var r = Math.hypot(window.innerWidth, window.innerHeight);
       root.style.setProperty('--vt-x', Math.round(x) + 'px');
       root.style.setProperty('--vt-y', Math.round(y) + 'px');
       root.style.setProperty('--vt-r', Math.ceil(r) + 'px');
