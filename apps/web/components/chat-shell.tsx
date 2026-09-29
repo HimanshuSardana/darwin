@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { loadMode, saveMode, type Mode } from "@/lib/mode";
+import { useSession } from "@/lib/auth-client";
 import {
   loadReasoningEffort,
   saveReasoningEffort,
@@ -29,6 +30,7 @@ import {
   type WorkspaceRecord,
 } from "@/lib/workspaces";
 import {
+  claimSession,
   loadSessions,
   removeSession,
   titleFromMessage,
@@ -40,7 +42,9 @@ const SIDEBAR_WIDTH = "18rem";
 const SIDEBAR_ICON_WIDTH = "3rem";
 
 export function ChatShell() {
-  const [sessions, setSessions] = useState<ChatSessionEntry[]>(loadSessions);
+  const { data: authSession } = useSession();
+  const userId = authSession?.user?.id ?? null;
+  const [sessions, setSessions] = useState<ChatSessionEntry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [reasoningEffort, setReasoningEffort] =
@@ -50,10 +54,41 @@ export function ChatShell() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceRecord | null>(null);
 
-  const handleSessionChange = useCallback((session: { readonly sessionId: string }) => {
-    setSessions((previous) => upsertSession(previous, session.sessionId));
-    setActiveId(session.sessionId);
-  }, []);
+  // Per-user session registry: load this user's list, claim each server-side
+  // (first writer wins), and drop anything owned by someone else — e.g.
+  // leftovers from another account in the same browser.
+  useEffect(() => {
+    if (!userId) {
+      setSessions([]);
+      return;
+    }
+    const local = loadSessions(userId);
+    if (local.length === 0) {
+      setSessions([]);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(local.map((entry) => claimSession(entry.sessionId))).then(
+      (results) => {
+        if (cancelled) return;
+        setSessions(local.filter((_, index) => results[index] === true));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const handleSessionChange = useCallback(
+    (session: { readonly sessionId: string }) => {
+      if (userId) {
+        void claimSession(session.sessionId);
+        setSessions((previous) => upsertSession(previous, userId, session.sessionId));
+      }
+      setActiveId(session.sessionId);
+    },
+    [userId],
+  );
 
   const handleFirstMessage = useCallback(
     (text: string) => {
@@ -67,25 +102,37 @@ export function ChatShell() {
         if (!target || target.title !== "New chat") return previous;
         // Workspace-bound sessions keep the workspace name.
         if (workspaceSessionIds.has(target.sessionId)) return previous;
-        return upsertSession(previous, target.sessionId, {
-          title: titleFromMessage(text),
-        });
+        return userId
+          ? upsertSession(previous, userId, target.sessionId, {
+              title: titleFromMessage(text),
+            })
+          : previous;
       });
     },
-    [activeId, workspaces],
+    [activeId, userId, workspaces],
   );
 
   const handleNew = useCallback(() => setActiveId(null), []);
 
-  const handleSelect = useCallback((sessionId: string) => {
-    setActiveId(sessionId);
-    setSessions((previous) => upsertSession(previous, sessionId));
-  }, []);
+  const handleSelect = useCallback(
+    (sessionId: string) => {
+      setActiveId(sessionId);
+      if (userId) {
+        setSessions((previous) => upsertSession(previous, userId, sessionId));
+      }
+    },
+    [userId],
+  );
 
-  const handleDelete = useCallback((sessionId: string) => {
-    setSessions((previous) => removeSession(previous, sessionId));
-    setActiveId((current) => (current === sessionId ? null : current));
-  }, []);
+  const handleDelete = useCallback(
+    (sessionId: string) => {
+      if (userId) {
+        setSessions((previous) => removeSession(previous, userId, sessionId));
+      }
+      setActiveId((current) => (current === sessionId ? null : current));
+    },
+    [userId],
+  );
 
   const handleReasoningChange = useCallback((effort: ReasoningEffort) => {
     setReasoningEffort(effort);
@@ -121,14 +168,17 @@ export function ChatShell() {
         saveWorkspace("vm");
         if (selected.sessionId) {
           const sessionId = selected.sessionId;
-          setSessions((previous) =>
-            upsertSession(previous, sessionId, { title: selected.name }),
-          );
+          if (userId) {
+            void claimSession(sessionId);
+            setSessions((previous) =>
+              upsertSession(previous, userId, sessionId, { title: selected.name }),
+            );
+          }
           setActiveId(sessionId);
         }
       }
     },
-    [],
+    [userId],
   );
 
   const handleNewWorkspace = useCallback(

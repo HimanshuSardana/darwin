@@ -1,6 +1,6 @@
 "use client";
 
-import { ContainerIcon, LaptopIcon, MessageSquareTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
+import { ContainerIcon, LaptopIcon, LogOutIcon, MessageSquareTextIcon, PlusIcon, SettingsIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,9 @@ import {
 import type { ChatSessionEntry } from "@/lib/sessions";
 import type { WorkspaceProvider } from "@/components/workspace-dialog";
 import type { WorkspaceRecord } from "@/lib/workspaces";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { authClient } from "@/lib/auth-client";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { WorkspaceDialog } from "@/components/workspace-dialog";
 
@@ -70,6 +72,17 @@ export function ChatSidebar({
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [workspaceDialogPending, setWorkspaceDialogPending] = useState(false);
   const [workspaceDialogError, setWorkspaceDialogError] = useState<string | null>(null);
+  const router = useRouter();
+  const signOut = () => {
+    void authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          router.push("/signin");
+          router.refresh();
+        },
+      },
+    });
+  };
   const dismissMobileSheet = () => {
     if (isMobile) setOpenMobile(false);
   };
@@ -203,6 +216,12 @@ export function ChatSidebar({
             <SidebarMenuButton onClick={() => setSettingsOpen(true)} tooltip="Settings">
               <SettingsIcon />
               <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={signOut} tooltip="Sign out">
+              <LogOutIcon />
+              <span>Sign out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
