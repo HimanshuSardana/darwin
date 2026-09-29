@@ -232,6 +232,7 @@ export function ChatSidebar({
                       </SidebarMenuButton>
                       <SidebarMenuAction
                         aria-label={`Delete workspace "${workspaceRecord.name}"`}
+                        className="top-1/2 -translate-y-1/2"
                         onClick={(event) => {
                           event.stopPropagation();
                           onDeleteWorkspace(workspaceRecord.id);
