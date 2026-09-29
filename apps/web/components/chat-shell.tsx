@@ -260,7 +260,6 @@ export function ChatShell() {
           modeOnChange={handleModeChange}
           namedWorkspaceContext={namedWorkspaceClientContext(activeWorkspace)}
           sessionId={activeId ?? undefined}
-          sessionless={activeId === null}
         />
       </SidebarInset>
     </SidebarProvider>
