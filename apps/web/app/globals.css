@@ -37,6 +37,8 @@
    overflow the pre's square background pokes past the border radius. */
 [data-streamdown="code-block-body"] {
   overflow: hidden;
+  /* Match the app's card radius so the rounding actually reads. */
+  border-radius: var(--radius-xl);
   /* Keep long lines clear of the overlaid buttons. */
   padding-right: 4.25rem;
 }
