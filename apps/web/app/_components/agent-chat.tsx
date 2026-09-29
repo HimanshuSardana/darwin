@@ -32,7 +32,8 @@ import { SlashMenu } from "@/components/slash-menu";
 import { matchSlashCommands, parseSlashCommand } from "@/lib/slash-commands";
 import { PlanTodos, parsePlanTodos } from "@/components/plan-todos";
 import { ReasoningSelect } from "@/components/reasoning-select";
-import { WorkspaceSelect } from "@/components/workspace-select";
+import { WorkspacePicker } from "@/components/workspace-picker";
+import type { WorkspaceRecord } from "@/lib/workspaces";
 import { modeClientContext, type Mode } from "@/lib/mode";
 import {
   reasoningClientContext,
@@ -50,13 +51,17 @@ const AGENT_NAME = WEB_CHAT_AGENT ?? DEFAULT_AGENT_NAME;
 export function AgentChat({
   embedded = false,
   manageHistory = true,
+  onMessageSent,
   onFirstMessage,
   onRequestNewChat,
   onSessionChange,
   reasoningEffort = "provider-default",
   reasoningOnChange,
   workspace = "vm",
-  workspaceOnChange,
+  namedWorkspaces,
+  activeNamedWorkspace,
+  onPickNamedWorkspace,
+  onNewNamedWorkspace,
   mode = "build",
   modeOnChange,
   namedWorkspaceContext,
@@ -66,7 +71,8 @@ export function AgentChat({
   readonly embedded?: boolean;
   /** When false, skips the standalone /s/:id history rewrite. */
   readonly manageHistory?: boolean;
-  /** First user message of a fresh session (for sidebar titles). */
+  /** Fired when the user dispatches a message (for activity timestamps). */
+  readonly onMessageSent?: (sessionId: string | undefined) => void;
   readonly onFirstMessage?: (text: string) => void;
   /** Override the header "New chat" action (shell switches panes instead). */
   readonly onRequestNewChat?: () => void;
@@ -77,7 +83,11 @@ export function AgentChat({
   readonly reasoningOnChange?: (effort: ReasoningEffort) => void;
   /** Composer workspace; sent as ephemeral turn context. */
   readonly workspace?: Workspace;
-  readonly workspaceOnChange?: (workspace: Workspace) => void;
+  /** Named workspaces for the composer picker (replaces the vm/host toggle). */
+  readonly namedWorkspaces?: readonly WorkspaceRecord[];
+  readonly activeNamedWorkspace?: WorkspaceRecord | null;
+  readonly onPickNamedWorkspace?: (workspace: WorkspaceRecord | null) => void;
+  readonly onNewNamedWorkspace?: () => void;
   /** Composer plan/build mode; sent first as ephemeral turn context. */
   readonly mode?: Mode;
   readonly modeOnChange?: (mode: Mode) => void;
@@ -97,6 +107,8 @@ export function AgentChat({
   onSessionChangeRef.current = onSessionChange;
   const onFirstMessageRef = useRef(onFirstMessage);
   onFirstMessageRef.current = onFirstMessage;
+  const onMessageSentRef = useRef(onMessageSent);
+  onMessageSentRef.current = onMessageSent;
   const agent = useEveAgent({
     agent: WEB_CHAT_AGENT,
     initialSession:
@@ -326,6 +338,7 @@ export function AgentChat({
 
     if (message.files.length === 0) {
       try {
+        onMessageSentRef.current?.(activeSessionId);
         await agent.send(text, options);
       } catch {
         setPendingSend(null);
@@ -347,6 +360,7 @@ export function AgentChat({
     }
 
     try {
+      onMessageSentRef.current?.(activeSessionId);
       await agent.send(parts, options);
     } catch {
       setPendingSend(null);
@@ -467,8 +481,13 @@ export function AgentChat({
           {modeOnChange ? (
             <ModeSelect onChange={modeOnChange} value={mode} />
           ) : null}
-          {workspaceOnChange ? (
-            <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
+          {namedWorkspaces && onPickNamedWorkspace && onNewNamedWorkspace ? (
+            <WorkspacePicker
+              onChange={onPickNamedWorkspace}
+              onNew={onNewNamedWorkspace}
+              value={activeNamedWorkspace ?? null}
+              workspaces={namedWorkspaces}
+            />
           ) : null}
           {reasoningOnChange ? (
             <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />

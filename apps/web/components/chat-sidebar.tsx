@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, ContainerIcon, LaptopIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { BotIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -43,30 +43,100 @@ function relativeTime(timestamp: number): string {
   });
 }
 
+/** Small initial-letter avatar for sidebar rows. */
+function RowAvatar({ label }: { readonly label: string }) {
+  const initial = label.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span
+      aria-hidden="true"
+      className="bg-sidebar-accent text-sidebar-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-medium group-data-[collapsible=icon]:size-4 group-data-[collapsible=icon]:rounded group-data-[collapsible=icon]:text-[10px]"
+    >
+      {initial}
+    </span>
+  );
+}
+
+/** Session row: hover swaps the timestamp for the delete action slot.
+ *  React-state driven (not CSS group-hover) so the two can never overlap. */
+function SessionRow({
+  active,
+  onDelete,
+  onSelect,
+  session,
+}: {
+  readonly active: boolean;
+  readonly onDelete: () => void;
+  readonly onSelect: () => void;
+  readonly session: ChatSessionEntry;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <SidebarMenuItem
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <SidebarMenuButton
+        isActive={active}
+        onClick={onSelect}
+        tooltip={session.title}
+        className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:mx-auto"
+      >
+        <RowAvatar label={session.title} />
+        <span className="min-w-0 flex-1 truncate font-normal text-sm group-data-[collapsible=icon]:hidden">
+          {session.title}
+        </span>
+        {hovered ? (
+          <span
+            aria-hidden="true"
+            className="flex w-10 shrink-0 items-center justify-end group-data-[collapsible=icon]:hidden"
+          >
+            <Trash2Icon
+              className="text-muted-foreground size-3.5"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            />
+          </span>
+        ) : (
+          <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-data-[collapsible=icon]:hidden">
+            {relativeTime(session.updatedAt)}
+          </span>
+        )}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 export function ChatSidebar({
   activeId,
   activeWorkspaceId,
   onDelete,
   onDeleteWorkspace,
   onNew,
-  onNewWorkspace,
   onSelect,
   onSelectWorkspace,
   sessions,
   workspaces,
+  workspaceDialogOpen,
+  onWorkspaceDialogChange,
+  onWorkspaceDialogSubmit,
 }: {
   readonly activeId: string | null;
   readonly activeWorkspaceId: string | null;
   readonly onDelete: (sessionId: string) => void;
   readonly onDeleteWorkspace: (id: string) => void;
   readonly onNew: () => void;
-  readonly onNewWorkspace: (
-    input: { name: string; provider: WorkspaceProvider },
-  ) => Promise<void>;
   readonly onSelect: (sessionId: string) => void;
   readonly onSelectWorkspace: (workspace: WorkspaceRecord | null) => void;
   readonly sessions: readonly ChatSessionEntry[];
   readonly workspaces: readonly WorkspaceRecord[];
+  readonly workspaceDialogOpen: boolean;
+  readonly onWorkspaceDialogChange: (open: boolean) => void;
+  readonly onWorkspaceDialogSubmit: (input: {
+    name: string;
+    provider: WorkspaceProvider;
+  }) => Promise<void>;
 }) {
   // On mobile the sidebar is a Sheet overlay (separate openMobile state
   // inside the provider). Dismiss it when the user picks a destination;
@@ -79,7 +149,6 @@ export function ChatSidebar({
     authSession?.user?.email?.split("@")[0] ||
     "User";
   const userEmail = authSession?.user?.email ?? "";
-  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [workspaceDialogPending, setWorkspaceDialogPending] = useState(false);
   const [workspaceDialogError, setWorkspaceDialogError] = useState<string | null>(null);
   const router = useRouter();
@@ -105,7 +174,7 @@ export function ChatSidebar({
     onNew();
   };
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar variant="floating" collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -128,7 +197,7 @@ export function ChatSidebar({
         <SidebarGroup>
           <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
           <SidebarGroupAction
-            onClick={() => setWorkspaceDialogOpen(true)}
+            onClick={() => onWorkspaceDialogChange(true)}
             title="Spin up workspace"
           >
             <PlusIcon />
@@ -138,13 +207,11 @@ export function ChatSidebar({
             {workspaces.length === 0 ? null : (
               <SidebarMenu>
                 {workspaces.map((workspaceRecord) => {
-                  const Icon =
-                    workspaceRecord.provider === "host" ? LaptopIcon : ContainerIcon;
                   return (
                     <SidebarMenuItem key={workspaceRecord.id}>
                       <SidebarMenuButton
                         isActive={workspaceRecord.id === activeWorkspaceId}
-                        className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
+                        className="h-auto py-2.5 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:mx-auto"
                         onClick={() => {
                           dismissMobileSheet();
                           onSelectWorkspace(
@@ -153,8 +220,8 @@ export function ChatSidebar({
                         }}
                         tooltip={workspaceRecord.name}
                       >
-                        <Icon />
-                        <span>
+                        <RowAvatar label={workspaceRecord.name} />
+                        <span className="group-data-[collapsible=icon]:hidden">
                           <span className="block truncate font-normal">
                             {workspaceRecord.name}
                           </span>
@@ -197,32 +264,13 @@ export function ChatSidebar({
             ) : (
               <SidebarMenu>
                 {sessions.map((session) => (
-                  <SidebarMenuItem key={session.sessionId}>
-                    <SidebarMenuButton
-                      isActive={session.sessionId === activeId}
-                      onClick={() => handleSelect(session.sessionId)}
-                      tooltip={session.title}
-                      className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-has-data-[sidebar=menu-action]/menu-item:pr-2"
-                    >
-                      <span className="min-w-0 flex-1 truncate font-normal text-sm">
-                        {session.title}
-                      </span>
-                      <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-hover/menu-item:invisible">
-                        {relativeTime(session.updatedAt)}
-                      </span>
-                    </SidebarMenuButton>
-                    <SidebarMenuAction
-                      aria-label={`Remove "${session.title}" from list`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDelete(session.sessionId);
-                      }}
-                      showOnHover
-                      title="Remove from list"
-                    >
-                      <Trash2Icon />
-                    </SidebarMenuAction>
-                  </SidebarMenuItem>
+                  <SessionRow
+                    active={session.sessionId === activeId}
+                    key={session.sessionId}
+                    onDelete={() => onDelete(session.sessionId)}
+                    onSelect={() => handleSelect(session.sessionId)}
+                    session={session}
+                  />
                 ))}
               </SidebarMenu>
             )}
@@ -245,15 +293,15 @@ export function ChatSidebar({
       <WorkspaceDialog
         error={workspaceDialogError}
         onOpenChange={(open) => {
-          setWorkspaceDialogOpen(open);
+          onWorkspaceDialogChange(open);
           if (open) setWorkspaceDialogError(null);
         }}
         onSubmit={async (input) => {
           setWorkspaceDialogPending(true);
           setWorkspaceDialogError(null);
           try {
-            await onNewWorkspace(input);
-            setWorkspaceDialogOpen(false);
+            await onWorkspaceDialogSubmit(input);
+            onWorkspaceDialogChange(false);
           } catch (error) {
             setWorkspaceDialogError(
               error instanceof Error ? error.message : "Could not spin up workspace.",

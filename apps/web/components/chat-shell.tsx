@@ -58,6 +58,7 @@ export function ChatShell() {
   const [mode, setMode] = useState<Mode>(loadMode);
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceRecord | null>(null);
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
 
   // Per-user session registry: load this user's list, claim each server-side
   // (first writer wins), and drop anything owned by someone else — e.g.
@@ -88,12 +89,27 @@ export function ChatShell() {
     (session: { readonly sessionId: string }) => {
       if (userId) {
         void claimSession(session.sessionId);
-        setSessions((previous) => upsertSession(previous, userId, session.sessionId));
+        // Adopt without touching: selecting/viewing must not reorder.
+        // Timestamps move only via touchSession (user sends) below.
+        setSessions((previous) =>
+          upsertSession(previous, userId, session.sessionId, { touch: false }),
+        );
       }
       // Adopt only into a fresh pane: remounting on first send would
       // destroy the hook store (and the optimistic sending bubble).
       setActiveId((current) => current ?? session.sessionId);
       setLiveSessionId(session.sessionId);
+    },
+    [userId],
+  );
+
+  const touchSession = useCallback(
+    (sessionId: string | undefined) => {
+      if (!userId || !sessionId) return;
+      setSessions((previous) => {
+        if (!previous.some((entry) => entry.sessionId === sessionId)) return previous;
+        return upsertSession(previous, userId, sessionId, { touch: true });
+      });
     },
     [userId],
   );
@@ -130,7 +146,8 @@ export function ChatShell() {
       setActiveId(sessionId);
       setLiveSessionId(sessionId);
       if (userId) {
-        setSessions((previous) => upsertSession(previous, userId, sessionId));
+        // Viewing must not reorder: refresh the entry without touching time.
+        setSessions((previous) => upsertSession(previous, userId, sessionId, { touch: false }));
       }
     },
     [userId],
@@ -150,11 +167,6 @@ export function ChatShell() {
   const handleReasoningChange = useCallback((effort: ReasoningEffort) => {
     setReasoningEffort(effort);
     saveReasoningEffort(effort);
-  }, []);
-
-  const handleWorkspaceChange = useCallback((next: Workspace) => {
-    setWorkspace(next);
-    saveWorkspace(next);
   }, []);
 
   const handleModeChange = useCallback((next: Mode) => {
@@ -245,11 +257,13 @@ export function ChatShell() {
           handleDeleteWorkspace(id).catch(() => {});
         }}
         onNew={handleNew}
-        onNewWorkspace={handleNewWorkspace}
         onSelect={handleSelect}
         onSelectWorkspace={handleSelectWorkspace}
+        onWorkspaceDialogChange={setWorkspaceDialogOpen}
+        onWorkspaceDialogSubmit={handleNewWorkspace}
         sessions={sessions}
         workspaces={workspaces}
+        workspaceDialogOpen={workspaceDialogOpen}
       />
       <SidebarInset>
         <MotionConfig reducedMotion="user">
@@ -268,12 +282,18 @@ export function ChatShell() {
           key={activeId ?? "new"}
           manageHistory={false}
           onFirstMessage={handleFirstMessage}
+          onMessageSent={(sessionId) => {
+            if (sessionId) touchSession(sessionId);
+          }}
           onRequestNewChat={handleNew}
           onSessionChange={handleSessionChange}
           reasoningEffort={reasoningEffort}
           reasoningOnChange={handleReasoningChange}
           workspace={workspace}
-          workspaceOnChange={handleWorkspaceChange}
+          namedWorkspaces={workspaces}
+          activeNamedWorkspace={activeWorkspace}
+          onPickNamedWorkspace={handleSelectWorkspace}
+          onNewNamedWorkspace={() => setWorkspaceDialogOpen(true)}
           mode={mode}
           modeOnChange={handleModeChange}
           namedWorkspaceContext={namedWorkspaceClientContext(activeWorkspace)}
