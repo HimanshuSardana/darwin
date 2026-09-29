@@ -49,10 +49,62 @@ function RowAvatar({ label }: { readonly label: string }) {
   return (
     <span
       aria-hidden="true"
-      className="bg-sidebar-accent text-sidebar-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-medium"
+      className="bg-sidebar-accent text-sidebar-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-medium group-data-[collapsible=icon]:size-4 group-data-[collapsible=icon]:rounded group-data-[collapsible=icon]:text-[10px]"
     >
       {initial}
     </span>
+  );
+}
+
+/** Session row: hover swaps the timestamp for the delete action slot.
+ *  React-state driven (not CSS group-hover) so the two can never overlap. */
+function SessionRow({
+  active,
+  onDelete,
+  onSelect,
+  session,
+}: {
+  readonly active: boolean;
+  readonly onDelete: () => void;
+  readonly onSelect: () => void;
+  readonly session: ChatSessionEntry;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <SidebarMenuItem
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <SidebarMenuButton
+        isActive={active}
+        onClick={onSelect}
+        tooltip={session.title}
+        className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:mx-auto"
+      >
+        <RowAvatar label={session.title} />
+        <span className="min-w-0 flex-1 truncate font-normal text-sm group-data-[collapsible=icon]:hidden">
+          {session.title}
+        </span>
+        {hovered ? (
+          <span
+            aria-hidden="true"
+            className="flex w-10 shrink-0 items-center justify-end group-data-[collapsible=icon]:hidden"
+          >
+            <Trash2Icon
+              className="text-muted-foreground size-3.5"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+            />
+          </span>
+        ) : (
+          <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-data-[collapsible=icon]:hidden">
+            {relativeTime(session.updatedAt)}
+          </span>
+        )}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
@@ -159,7 +211,7 @@ export function ChatSidebar({
                     <SidebarMenuItem key={workspaceRecord.id}>
                       <SidebarMenuButton
                         isActive={workspaceRecord.id === activeWorkspaceId}
-                        className="h-auto py-2.5 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
+                        className="h-auto py-2.5 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:mx-auto"
                         onClick={() => {
                           dismissMobileSheet();
                           onSelectWorkspace(
@@ -212,33 +264,13 @@ export function ChatSidebar({
             ) : (
               <SidebarMenu>
                 {sessions.map((session) => (
-                  <SidebarMenuItem key={session.sessionId}>
-                    <SidebarMenuButton
-                      isActive={session.sessionId === activeId}
-                      onClick={() => handleSelect(session.sessionId)}
-                      tooltip={session.title}
-                      className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-has-data-[sidebar=menu-action]/menu-item:pr-2"
-                    >
-                      <RowAvatar label={session.title} />
-                      <span className="min-w-0 flex-1 truncate font-normal text-sm group-data-[collapsible=icon]:hidden">
-                        {session.title}
-                      </span>
-                      <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-hover/menu-item:opacity-0">
-                        {relativeTime(session.updatedAt)}
-                      </span>
-                    </SidebarMenuButton>
-                    <SidebarMenuAction
-                      aria-label={`Remove "${session.title}" from list`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDelete(session.sessionId);
-                      }}
-                      showOnHover
-                      title="Remove from list"
-                    >
-                      <Trash2Icon />
-                    </SidebarMenuAction>
-                  </SidebarMenuItem>
+                  <SessionRow
+                    active={session.sessionId === activeId}
+                    key={session.sessionId}
+                    onDelete={() => onDelete(session.sessionId)}
+                    onSelect={() => handleSelect(session.sessionId)}
+                    session={session}
+                  />
                 ))}
               </SidebarMenu>
             )}

@@ -89,12 +89,27 @@ export function ChatShell() {
     (session: { readonly sessionId: string }) => {
       if (userId) {
         void claimSession(session.sessionId);
-        setSessions((previous) => upsertSession(previous, userId, session.sessionId));
+        // Adopt without touching: selecting/viewing must not reorder.
+        // Timestamps move only via touchSession (user sends) below.
+        setSessions((previous) =>
+          upsertSession(previous, userId, session.sessionId, { touch: false }),
+        );
       }
       // Adopt only into a fresh pane: remounting on first send would
       // destroy the hook store (and the optimistic sending bubble).
       setActiveId((current) => current ?? session.sessionId);
       setLiveSessionId(session.sessionId);
+    },
+    [userId],
+  );
+
+  const touchSession = useCallback(
+    (sessionId: string | undefined) => {
+      if (!userId || !sessionId) return;
+      setSessions((previous) => {
+        if (!previous.some((entry) => entry.sessionId === sessionId)) return previous;
+        return upsertSession(previous, userId, sessionId, { touch: true });
+      });
     },
     [userId],
   );
@@ -267,6 +282,9 @@ export function ChatShell() {
           key={activeId ?? "new"}
           manageHistory={false}
           onFirstMessage={handleFirstMessage}
+          onMessageSent={(sessionId) => {
+            if (sessionId) touchSession(sessionId);
+          }}
           onRequestNewChat={handleNew}
           onSessionChange={handleSessionChange}
           reasoningEffort={reasoningEffort}

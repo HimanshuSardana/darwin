@@ -51,6 +51,7 @@ const AGENT_NAME = WEB_CHAT_AGENT ?? DEFAULT_AGENT_NAME;
 export function AgentChat({
   embedded = false,
   manageHistory = true,
+  onMessageSent,
   onFirstMessage,
   onRequestNewChat,
   onSessionChange,
@@ -70,7 +71,8 @@ export function AgentChat({
   readonly embedded?: boolean;
   /** When false, skips the standalone /s/:id history rewrite. */
   readonly manageHistory?: boolean;
-  /** First user message of a fresh session (for sidebar titles). */
+  /** Fired when the user dispatches a message (for activity timestamps). */
+  readonly onMessageSent?: (sessionId: string | undefined) => void;
   readonly onFirstMessage?: (text: string) => void;
   /** Override the header "New chat" action (shell switches panes instead). */
   readonly onRequestNewChat?: () => void;
@@ -105,6 +107,8 @@ export function AgentChat({
   onSessionChangeRef.current = onSessionChange;
   const onFirstMessageRef = useRef(onFirstMessage);
   onFirstMessageRef.current = onFirstMessage;
+  const onMessageSentRef = useRef(onMessageSent);
+  onMessageSentRef.current = onMessageSent;
   const agent = useEveAgent({
     agent: WEB_CHAT_AGENT,
     initialSession:
@@ -334,6 +338,7 @@ export function AgentChat({
 
     if (message.files.length === 0) {
       try {
+        onMessageSentRef.current?.(activeSessionId);
         await agent.send(text, options);
       } catch {
         setPendingSend(null);
@@ -355,6 +360,7 @@ export function AgentChat({
     }
 
     try {
+      onMessageSentRef.current?.(activeSessionId);
       await agent.send(parts, options);
     } catch {
       setPendingSend(null);
