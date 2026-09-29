@@ -226,10 +226,18 @@ export function AgentChat({
   // Cleared once the status leaves "submitted" (streaming/error) or the
   // transcript grows past what_submit saw (covers optimistic projection).
   const [pendingSend, setPendingSend] = useState<string | null>(null);
-  const messageCountAtSubmitRef = useRef(0);
-  const showSyntheticSend =
-    pendingSend !== null && agent.data.messages.length <= messageCountAtSubmitRef.current;
-  const showConversationLayout = isResuming || hasConversationContent || showSyntheticSend;
+  // While the turn hasn't produced stream events yet, the last user message
+  // (optimistic or synthetic) renders muted with a Sending shimmer.
+  const isSending = agent.status === "submitted";
+  const lastUserIndex = (() => {
+    const messages = agent.data.messages;
+    for (let index = messages.length - 1; index >= 0; index--) {
+      if (messages[index].role === "user") return index;
+    }
+    return -1;
+  })();
+  const showSyntheticSend = isSending && lastUserIndex === -1 && pendingSend !== null;
+  const showConversationLayout = isResuming || hasConversationContent || isSending;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
 
   const requestCancellation = () => {
@@ -311,7 +319,6 @@ export function AgentChat({
     }
     // Arm the optimistic sending state *after* slash handling, right before
     // the turn actually dispatches (bare mode-switches return early above).
-    messageCountAtSubmitRef.current = agent.data.messages.length;
     if (text.length > 0) {
       setPendingSend(text);
     }
@@ -364,7 +371,28 @@ export function AgentChat({
             {agent.data.messages.map((message, index) =>
               showPendingThinking &&
               isPendingAssistantShell &&
-              message.id === lastMessage.id ? null : (
+              message.id === lastMessage.id ? null : isSending &&
+                index === lastUserIndex ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 0.55, y: 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  key={message.id}
+                >
+                  <AgentMessage
+                    canRespond={false}
+                    isStreaming={false}
+                    message={message}
+                    onInputResponses={(inputResponses) => {
+                      setCancellationError(undefined);
+                      return agent.respond(inputResponses);
+                    }}
+                  />
+                  <div className="text-muted-foreground mt-1 flex justify-end pr-1 text-xs">
+                    <Shimmer duration={1.2}>Sending…</Shimmer>
+                  </div>
+                </motion.div>
+              ) : (
                 <AgentMessage
                   canRespond={!isBusy && !isResuming}
                   isStreaming={
