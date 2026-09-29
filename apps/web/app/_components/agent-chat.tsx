@@ -3,6 +3,7 @@
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
 import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, ListChecksIcon, PanelRightIcon, PlusIcon, SquareIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Conversation,
@@ -40,6 +41,7 @@ import {
 import { workspaceClientContext, type Workspace } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
+import { useSession } from "@/lib/auth-client";
 import { WEB_CHAT_AGENT } from "@/app/eve-agent";
 
 const DEFAULT_AGENT_NAME = "eve-agent";
@@ -83,6 +85,11 @@ export function AgentChat({
   readonly namedWorkspaceContext?: string | null;
   readonly sessionId?: string;
 }) {
+  const { data: authSession } = useSession();
+  const firstName =
+    authSession?.user?.name?.trim().split(/\s+/)[0] ||
+    authSession?.user?.email?.split("@")[0] ||
+    "there";
   const [cancellationError, setCancellationError] = useState<string>();
   const [hasInputText, setHasInputText] = useState(false);
   const titledSessionRef = useRef<string | null>(null);
@@ -398,7 +405,9 @@ export function AgentChat({
   );
 
   const composerView = (
-    <div
+    <motion.div
+      layout
+      transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
       className={cn(
         "w-full px-4 sm:px-6",
         showConversationLayout
@@ -450,7 +459,7 @@ export function AgentChat({
         ) : null}
         {composer}
       </div>
-    </div>
+    </motion.div>
   );
 
   return (
