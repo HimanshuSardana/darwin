@@ -59,7 +59,6 @@ export function AgentChat({
   modeOnChange,
   namedWorkspaceContext,
   sessionId,
-  sessionless = false,
 }: {
   /** Render inside the sidebar shell as a static flex column. */
   readonly embedded?: boolean;
@@ -83,7 +82,6 @@ export function AgentChat({
   /** Named persistent workspace context; appended to ephemeral turn context. */
   readonly namedWorkspaceContext?: string | null;
   readonly sessionId?: string;
-  readonly sessionless?: boolean;
 }) {
   const [cancellationError, setCancellationError] = useState<string>();
   const [hasInputText, setHasInputText] = useState(false);
@@ -210,7 +208,7 @@ export function AgentChat({
   );
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
-  const hasConversationContent = sessionless || !isEmpty || errorMessage !== undefined;
+  const hasConversationContent = !isEmpty || errorMessage !== undefined;
   const showConversationLayout = isResuming || hasConversationContent;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
 
