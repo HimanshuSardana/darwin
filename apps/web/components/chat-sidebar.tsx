@@ -232,7 +232,9 @@ export function ChatSidebar({
                       </SidebarMenuButton>
                       <SidebarMenuAction
                         aria-label={`Delete workspace "${workspaceRecord.name}"`}
-                        className="top-1/2 -translate-y-1/2"
+                        // Inline position beats the size-based top-* rule in
+                        // ui/sidebar (higher-specificity peer-data selector).
+                        style={{ top: "50%", transform: "translateY(-50%)" }}
                         onClick={(event) => {
                           event.stopPropagation();
                           onDeleteWorkspace(workspaceRecord.id);
