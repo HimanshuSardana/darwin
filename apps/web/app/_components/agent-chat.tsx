@@ -2,7 +2,7 @@
 
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
-import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, ListChecksIcon, PanelRightIcon, PlusIcon, SquareIcon } from "lucide-react";
+import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, GlobeIcon, ListChecksIcon, PlusIcon, SquareIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -476,7 +476,7 @@ export function AgentChat({
             type="button"
             variant={browserOpen ? "secondary" : "ghost"}
           >
-            <PanelRightIcon className="size-4" />
+            <GlobeIcon className="size-4" />
           </Button>
           {modeOnChange ? (
             <ModeSelect onChange={modeOnChange} value={mode} />
