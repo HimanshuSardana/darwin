@@ -32,7 +32,7 @@ export default defineTool({
       throw new Error(`VM path must be absolute: ${path}`);
     }
     const sandbox = await ctx.getSandbox(environment);
-    const data = await sandbox.readBinaryFile(path);
+    const data = await sandbox.readBinaryFile({ path });
     if (!data) {
       throw new Error(`No such file in the VM: ${path}`);
     }
