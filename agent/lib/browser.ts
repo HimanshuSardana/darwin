@@ -44,9 +44,20 @@ export interface BrowserResult {
   truncated: boolean;
 }
 
-export function runBrowser(args: string[], timeoutMs = 60_000): Promise<BrowserResult> {
+export function runBrowser(
+  args: string[],
+  timeoutMs = 60_000,
+  env?: Record<string, string>,
+): Promise<BrowserResult> {
   return new Promise((resolvePromise) => {
-    execFile(binary(), args, { timeout: timeoutMs, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(
+      binary(),
+      args,
+      {
+        timeout: timeoutMs,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, AGENT_BROWSER_STREAM_PORT: "9223", ...env },
+      }, (error, stdout, stderr) => {
       const out = truncate(String(stdout ?? ""));
       const err = truncate(String(stderr ?? ""));
       resolvePromise({

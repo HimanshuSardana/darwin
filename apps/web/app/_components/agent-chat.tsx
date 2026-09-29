@@ -2,8 +2,8 @@
 
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
-import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, ListChecksIcon, PlusIcon, SquareIcon } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, ListChecksIcon, PanelRightIcon, PlusIcon, SquareIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Conversation,
   ConversationContent,
@@ -24,6 +24,8 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
+import { BrowserPanel } from "@/components/browser-panel";
+import { useBrowserStream } from "@/lib/use-browser-stream";
 import { ModeSelect } from "@/components/mode-select";
 import { SlashMenu } from "@/components/slash-menu";
 import { matchSlashCommands, parseSlashCommand } from "@/lib/slash-commands";
@@ -150,6 +152,55 @@ export function AgentChat({
   const showPlanBar =
     activePlan !== null && activeTodoCount < activePlan.todos.length;
   const [planExpanded, setPlanExpanded] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [browserFullscreen, setBrowserFullscreen] = useState(false);
+  const [manualShot, setManualShot] = useState<string | null>(null);
+  const browserActivity = useMemo(() => {
+    const messages = agent.data.messages;
+    let shot: string | null = null;
+    let url: string | null = null;
+    let active = false;
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const parts = messages[index].parts;
+      for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
+        const part = parts[partIndex] as {
+          readonly input?: unknown;
+          readonly output?: unknown;
+          readonly toolName?: unknown;
+          readonly type?: string;
+        };
+        if (part.type !== "dynamic-tool" || typeof part.toolName !== "string") continue;
+        if (!part.toolName.startsWith("browser_")) continue;
+        active = true;
+        if (shot === null && part.toolName === "browser_screenshot") {
+          const output = part.output as { shot?: unknown } | null;
+          if (output && typeof output.shot === "string") shot = output.shot;
+        }
+        if (url === null && part.toolName === "browser_navigate") {
+          const input = part.input as { url?: unknown } | null;
+          if (input && typeof input.url === "string") url = input.url;
+        }
+      }
+    }
+    return { active, shot, url };
+  }, [agent.data.messages]);
+  useEffect(() => {
+    if (browserActivity.active) setBrowserOpen(true);
+  }, [browserActivity.active]);
+  const browserShotUrl = manualShot ?? (browserActivity.shot ? `/api/shots/${browserActivity.shot}` : null);
+  const browserUrl = browserActivity.url;
+  const browserStream = useBrowserStream(browserOpen && embedded, browserUrl);
+  const refreshBrowserShot = async () => {
+    try {
+      const response = await fetch("/api/shots/latest");
+      const data = (await response.json()) as { latest?: unknown };
+      if (typeof data.latest === "string") {
+        setManualShot(`/api/shots/${data.latest}?t=${Date.now()}`);
+      }
+    } catch {
+      // Panel keeps showing the last known shot.
+    }
+  };
   const [composerText, setComposerText] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashDismissed, setSlashDismissed] = useState(false);
@@ -262,55 +313,7 @@ export function AgentChat({
     await agent.send(parts, options);
   };
 
-  const composer = (
-    <PromptInput onSubmit={handleSubmit}>
-      <PromptInputBody>
-        <PromptInputTextarea
-          disabled={isResuming}
-          onChange={handleComposerChange}
-          onKeyDown={handleComposerKeyDown}
-          placeholder="Send a message… ( / for commands )"
-          value={composerText}
-        />
-      </PromptInputBody>
-      <PromptInputFooter>
-        <PromptInputTools>
-          {modeOnChange ? (
-            <ModeSelect onChange={modeOnChange} value={mode} />
-          ) : null}
-          {workspaceOnChange ? (
-            <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
-          ) : null}
-          {reasoningOnChange ? (
-            <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />
-          ) : null}
-        </PromptInputTools>
-        <ComposerAction
-          hasInputText={hasInputText}
-          isBusy={isBusy}
-          isResuming={isResuming}
-          onCancel={requestCancellation}
-        />
-      </PromptInputFooter>
-    </PromptInput>
-  );
-
-  return (
-    <main
-      className={cn(
-        "flex flex-col overflow-hidden bg-background text-foreground",
-        embedded ? "h-svh min-h-0 min-w-0 flex-1" : "h-dvh",
-      )}
-    >
-      {showConversationLayout ? (
-        <ChatHeader
-          canStartNewChat={activeSessionId !== undefined}
-          embedded={embedded}
-          onRequestNewChat={onRequestNewChat}
-        />
-      ) : null}
-
-      {showConversationLayout ? (
+  const conversationView = !showConversationLayout ? null : (
         <Conversation
           className="min-h-0 flex-1"
           initial={sessionId === undefined ? undefined : false}
@@ -351,63 +354,150 @@ export function AgentChat({
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
+  );
+
+  const composer = (
+    <PromptInput onSubmit={handleSubmit}>
+      <PromptInputBody>
+        <PromptInputTextarea
+          disabled={isResuming}
+          onChange={handleComposerChange}
+          onKeyDown={handleComposerKeyDown}
+          placeholder="Send a message… ( / for commands )"
+          value={composerText}
+        />
+      </PromptInputBody>
+      <PromptInputFooter>
+        <PromptInputTools>
+          <Button
+            aria-label="Toggle browser panel"
+            onClick={() => setBrowserOpen((open) => !open)}
+            size="icon-sm"
+            title="Browser panel"
+            type="button"
+            variant={browserOpen ? "secondary" : "ghost"}
+          >
+            <PanelRightIcon className="size-4" />
+          </Button>
+          {modeOnChange ? (
+            <ModeSelect onChange={modeOnChange} value={mode} />
+          ) : null}
+          {workspaceOnChange ? (
+            <WorkspaceSelect onChange={workspaceOnChange} value={workspace} />
+          ) : null}
+          {reasoningOnChange ? (
+            <ReasoningSelect onChange={reasoningOnChange} value={reasoningEffort} />
+          ) : null}
+        </PromptInputTools>
+        <ComposerAction
+          hasInputText={hasInputText}
+          isBusy={isBusy}
+          isResuming={isResuming}
+          onCancel={requestCancellation}
+        />
+      </PromptInputFooter>
+    </PromptInput>
+  );
+
+  const composerView = (
+    <div
+      className={cn(
+        "w-full px-4 sm:px-6",
+        showConversationLayout
+          ? "mx-auto max-w-3xl shrink-0 pt-2 pb-6"
+          : "mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
+        !embedded &&
+          showConversationLayout &&
+          "fixed bottom-0 left-1/2 z-20 -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4",
+      )}
+    >
+      {showConversationLayout ? null : (
+        <div className="flex flex-col items-center gap-3 text-center">
+          <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
+        </div>
+      )}
+      <div className="relative w-full">
+        {slashMatches.length > 0 ? (
+          <SlashMenu
+            commands={slashMatches}
+            onPick={(command) => completeSlash(command.name)}
+            selectedIndex={Math.min(slashIndex, slashMatches.length - 1)}
+          />
+        ) : null}
+        {showPlanBar && activePlan ? (
+          <div className="mb-2">
+            <button
+              aria-expanded={planExpanded}
+              className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent/60"
+              onClick={() => setPlanExpanded((open) => !open)}
+              type="button"
+            >
+              <ListChecksIcon className="size-4 text-muted-foreground" />
+              <span className="font-medium">Plan</span>
+              <span className="text-muted-foreground text-xs tabular-nums">
+                {activeTodoCount}/{activePlan.todos.length}
+              </span>
+              {planExpanded ? (
+                <ChevronUpIcon className="size-4 text-muted-foreground ml-auto" />
+              ) : (
+                <ChevronDownIcon className="size-4 text-muted-foreground ml-auto" />
+              )}
+            </button>
+            {planExpanded ? (
+              <div className="mt-2">
+                <PlanTodos summary={activePlan.summary} todos={activePlan.todos} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {composer}
+      </div>
+    </div>
+  );
+
+  return (
+    <main
+      className={cn(
+        "flex flex-col overflow-hidden bg-background text-foreground",
+        embedded ? "h-svh min-h-0 min-w-0 flex-1" : "h-dvh",
+      )}
+    >
+      {showConversationLayout ? (
+        <ChatHeader
+          canStartNewChat={activeSessionId !== undefined}
+          embedded={embedded}
+          onRequestNewChat={onRequestNewChat}
+        />
       ) : null}
 
-      <div
-        className={cn(
-          "w-full px-4 sm:px-6",
-          showConversationLayout
-            ? // Static flex child in embedded mode: centers by construction,
-              // no viewport math. Standalone keeps the overlay composer.
-              "mx-auto max-w-3xl shrink-0 pt-2 pb-6"
-            : "mx-auto flex max-w-xl flex-1 flex-col items-center justify-center gap-8 pb-[10vh]",
-          !embedded &&
-            showConversationLayout &&
-            "fixed bottom-0 left-1/2 z-20 -translate-x-1/2 bg-gradient-to-t from-background via-background to-transparent pt-4",
-        )}
-      >
-        {showConversationLayout ? null : (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
+      {embedded ? (
+        <div className="flex min-h-0 flex-1 flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {conversationView}
+            {composerView}
           </div>
-        )}
-        <div className="relative w-full">
-          {slashMatches.length > 0 ? (
-            <SlashMenu
-              commands={slashMatches}
-              onPick={(command) => completeSlash(command.name)}
-              selectedIndex={Math.min(slashIndex, slashMatches.length - 1)}
+          {browserOpen ? (
+            <BrowserPanel
+              fullscreen={browserFullscreen}
+              live={browserStream.live}
+              onClose={() => {
+                setBrowserOpen(false);
+                setBrowserFullscreen(false);
+              }}
+              onFullscreen={() => setBrowserFullscreen((full) => !full)}
+              onRefresh={() => void refreshBrowserShot()}
+              shotUrl={browserShotUrl}
+              streamFrame={browserStream.frame}
+              url={browserStream.url}
             />
           ) : null}
-          {showPlanBar && activePlan ? (
-            <div className="mb-2">
-              <button
-                aria-expanded={planExpanded}
-                className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm transition-colors hover:bg-accent/60"
-                onClick={() => setPlanExpanded((open) => !open)}
-                type="button"
-              >
-                <ListChecksIcon className="size-4 text-muted-foreground" />
-                <span className="font-medium">Plan</span>
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {activeTodoCount}/{activePlan.todos.length}
-                </span>
-                {planExpanded ? (
-                  <ChevronUpIcon className="size-4 text-muted-foreground ml-auto" />
-                ) : (
-                  <ChevronDownIcon className="size-4 text-muted-foreground ml-auto" />
-                )}
-              </button>
-              {planExpanded ? (
-                <div className="mt-2">
-                  <PlanTodos summary={activePlan.summary} todos={activePlan.todos} />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {composer}
         </div>
-      </div>
+      ) : (
+        <>
+          {conversationView}
+          {composerView}
+        </>
+      )}
     </main>
   );
 }

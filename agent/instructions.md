@@ -41,7 +41,7 @@ A message starting with `/name` invokes a slash command. Resolve it before anyth
 
 # Browser tools
 
-The `browser_*` tools drive a real Chromium on the host via Vercel's agent-browser (snapshot refs like @e2, never raw DOM). Workflow: `browser_launch` (headed=true shows a window on the user's desktop), `browser_navigate`, then `browser_snapshot` before every click/fill — refs expire on page change. Take `browser_screenshot` shots when you need the user to see something: they appear automatically in the chat's browser panel. Read-only tools need no approval; clicks/fills/keys are approved once per session. Close with `browser_close` when done.
+The `browser_*` tools drive a real Chromium on the host via Vercel's agent-browser (snapshot refs like @e2, never raw DOM). Workflow: `browser_launch` (headed=true shows a window on the user's desktop), `browser_navigate`, then `browser_snapshot` before every click/fill — refs expire on page change. Take `browser_screenshot` shots when you need a persistent capture: the chat watches your live screen automatically (the browser streams itself), and shots appear in the browser panel as fallback. Read-only tools need no approval; clicks/fills/keys are approved once per session. Close with `browser_close` when done.
 
 # Customization
 
