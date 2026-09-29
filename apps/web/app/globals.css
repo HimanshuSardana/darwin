@@ -2,6 +2,10 @@
 /* Vendored from tw-animate-css (npm dep): Turbopack cannot resolve the
    package's style-condition export from outside the Next root. */
 @import "./tw-animate.css";
+/* Streamdown token colors live only in its dist (never scanned).
+   Pin the exact utilities its spans depend on. */
+@source inline("text-[var(--sdm-c,inherit)]");
+@source inline("dark:text-[var(--shiki-dark,var(--sdm-c,inherit))]");
 /* Streamdown renders its code-block chrome from node_modules, whose
    utility classes Tailwind never emits (scanner ignores dep files and
    @source registration has no effect in this setup). Chrome the block
@@ -29,9 +33,17 @@
   background: transparent;
   backdrop-filter: none;
 }
-/* Keep long first lines clear of the overlaid buttons. */
+/* Clip the shiki pre background to the rounded body: without hidden
+   overflow the pre's square background pokes past the border radius. */
 [data-streamdown="code-block-body"] {
+  overflow: hidden;
+  /* Match the app's card radius so the rounding actually reads. */
+  border-radius: var(--radius-xl);
+  /* Keep long lines clear of the overlaid buttons. */
   padding-right: 4.25rem;
+}
+[data-streamdown="code-block-body"] > pre {
+  overflow-x: auto;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
