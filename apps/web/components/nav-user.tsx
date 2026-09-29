@@ -31,7 +31,10 @@ export function NavUser({
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        {/* Non-modal: a modal menu would lock body pointer-events, and
+            opening the Settings dialog on top can leave that lock stuck,
+            freezing all clicks after the dialog closes. */}
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
