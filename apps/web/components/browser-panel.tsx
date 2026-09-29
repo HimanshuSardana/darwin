@@ -2,6 +2,7 @@
 
 import { Maximize2Icon, Minimize2Icon, MonitorIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +54,10 @@ export function BrowserPanel({
   };
 
   const src = streamFrame ?? shotUrl;
-  return (
+  // Fullscreen portals to document.body: fixed positioning is relative to
+  // the nearest transformed/filtered ancestor, and app chrome (sidebars,
+  // animated containers) can trap it. The portal guarantees viewport fill.
+  const window_ = (
     <div
       ref={frameRef}
       style={pos ? { left: pos.x, top: pos.y } : { top: 72, right: 16 }}
@@ -140,4 +144,8 @@ export function BrowserPanel({
       </div>
     </div>
   );
+  if (fullscreen && typeof document !== "undefined") {
+    return createPortal(window_, document.body);
+  }
+  return window_;
 }
