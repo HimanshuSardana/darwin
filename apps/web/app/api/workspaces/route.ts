@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { sanitizePackageIds } from "@/lib/packages";
 
 export interface WorkspaceRecord {
   readonly id: string;
@@ -15,6 +16,8 @@ export interface WorkspaceRecord {
   readonly sessionId: string | null;
   /** Host directory for host workspaces. */
   readonly path: string | null;
+  /** Catalog package ids to ensure installed (microvm only). */
+  readonly packages: string[];
   readonly createdAt: number;
 }
 
@@ -57,7 +60,9 @@ export async function GET() {
   }
   const all = await loadAll();
   return NextResponse.json({
-    workspaces: all.filter((entry) => entry.ownerId === userId),
+    workspaces: all
+      .filter((entry) => entry.ownerId === userId)
+      .map((entry) => ({ ...entry, packages: entry.packages ?? [] })),
   });
 }
 
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
     name?: unknown;
     provider?: unknown;
     sessionId?: unknown;
+    packages?: unknown;
   } | null;
   const name = typeof body?.name === "string" ? body.name.trim().slice(0, 60) : "";
   const provider = body?.provider === "host" ? "host" : "microvm";
@@ -101,6 +107,9 @@ export async function POST(request: Request) {
     ownerId: userId,
     sessionId,
     path,
+    packages: provider === "microvm" ? sanitizePackageIds(
+      Array.isArray(body?.packages) ? body.packages : [],
+    ) : [],
     createdAt: Date.now(),
   };
   const all = existing;
