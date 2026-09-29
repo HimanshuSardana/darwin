@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Floating browser window: spawns top-right, drags by its header,
- * reveals fullscreen/close controls on hover. Fullscreen takes over.
+ * Chromeless floating browser window: just the screen. All controls live
+ * in an overlay bar that appears on hover/focus. Drag from anywhere except
+ * the controls themselves.
  */
 export function BrowserPanel({
   fullscreen,
@@ -32,7 +33,7 @@ export function BrowserPanel({
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
 
-  const onHeaderPointerDown = (event: React.PointerEvent) => {
+  const onPointerDown = (event: React.PointerEvent) => {
     if (fullscreen) return;
     if ((event.target as HTMLElement).closest("button")) return;
     const rect = frameRef.current?.getBoundingClientRect();
@@ -40,13 +41,10 @@ export function BrowserPanel({
     dragRef.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
-  const onHeaderPointerMove = (event: React.PointerEvent) => {
+  const onPointerMove = (event: React.PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const x = Math.min(
-      Math.max(event.clientX - drag.dx, 8),
-      window.innerWidth - 120,
-    );
+    const x = Math.min(Math.max(event.clientX - drag.dx, 8), window.innerWidth - 120);
     const y = Math.min(Math.max(event.clientY - drag.dy, 8), window.innerHeight - 80);
     setPos({ x, y });
   };
@@ -59,64 +57,30 @@ export function BrowserPanel({
     <div
       ref={frameRef}
       style={pos ? { left: pos.x, top: pos.y } : { top: 72, right: 16 }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
       className={cn(
-        "group/window flex flex-col overflow-hidden rounded-xl border bg-background shadow-xl",
+        "group/window overflow-hidden rounded-xl border bg-background shadow-xl select-none",
         fullscreen ? "fixed inset-0 z-50" : "fixed z-40 w-[440px] max-w-[90vw]",
       )}
     >
-      <div
-        className="flex h-11 shrink-0 cursor-grab touch-none items-center gap-1 border-b px-2.5 select-none active:cursor-grabbing"
-        onPointerDown={onHeaderPointerDown}
-        onPointerMove={onHeaderPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-        <MonitorIcon className="text-muted-foreground size-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate px-1 text-sm text-muted-foreground">
-          {url ?? "Browser"}
-        </span>
-        <span
-          className={cn(
-            "mr-1 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-            live ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground",
-          )}
-          title={live ? "Live browser stream" : "Stream offline — showing last screenshot"}
-        >
-          <span className={cn("size-1.5 rounded-full", live ? "bg-emerald-500" : "bg-muted-foreground")} />
-          {live ? "LIVE" : "OFFLINE"}
-        </span>
-        <Button aria-label="Refresh view" onClick={onRefresh} size="icon-sm" variant="ghost">
-          <RefreshCwIcon className="size-4" />
-        </Button>
-        <span className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover/window:opacity-100 focus-within:opacity-100">
-          <Button
-            aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
-            onClick={onFullscreen}
-            size="icon-sm"
-            variant="ghost"
-          >
-            {fullscreen ? <Minimize2Icon className="size-4" /> : <Maximize2Icon className="size-4" />}
-          </Button>
-          <Button aria-label="Close browser panel" onClick={onClose} size="icon-sm" variant="ghost">
-            <XIcon className="size-4" />
-          </Button>
-        </span>
-      </div>
-      <div className="relative aspect-video min-h-0 w-full bg-muted/30">
+      <div className="relative aspect-video w-full touch-none bg-muted/30">
         {src ? (
           live ? (
-            <div className="absolute inset-0 flex items-center justify-center p-2">
-              <img
-                alt="Live browser view"
-                className="max-h-full max-w-full rounded-md border bg-background object-contain shadow-sm"
-                src={src}
-              />
-            </div>
+            <img
+              alt="Live browser view"
+              className="absolute inset-0 h-full w-full object-contain"
+              draggable={false}
+              src={src}
+            />
           ) : (
-            <div className="absolute inset-0 overflow-auto p-2">
+            <div className="absolute inset-0 overflow-auto">
               <img
                 alt="Last browser screenshot"
-                className="h-auto w-full rounded-md border bg-background shadow-sm"
+                className="h-auto w-full"
+                draggable={false}
                 key={src}
                 src={src}
               />
@@ -130,6 +94,49 @@ export function BrowserPanel({
             </p>
           </div>
         )}
+        {/* Controls overlay: only on hover/focus. */}
+        <div className="absolute inset-x-0 top-0 flex items-center gap-1 bg-gradient-to-b from-black/70 to-transparent px-2.5 pt-2 pb-5 opacity-0 transition-opacity group-hover/window:opacity-100 focus-within:opacity-100">
+          <span className="min-w-0 flex-1 truncate px-1 text-xs text-white/90">
+            {url ?? "Browser"}
+          </span>
+          <span
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+              live ? "bg-emerald-500/25 text-emerald-300" : "bg-white/15 text-white/80",
+            )}
+            title={live ? "Live browser stream" : "Stream offline — showing last screenshot"}
+          >
+            <span className={cn("size-1.5 rounded-full", live ? "bg-emerald-400" : "bg-white/60")} />
+            {live ? "LIVE" : "OFFLINE"}
+          </span>
+          <Button
+            aria-label="Refresh view"
+            className="size-7 text-white/90 hover:bg-white/15 hover:text-white"
+            onClick={onRefresh}
+            size="icon-sm"
+            variant="ghost"
+          >
+            <RefreshCwIcon className="size-3.5" />
+          </Button>
+          <Button
+            aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
+            className="size-7 text-white/90 hover:bg-white/15 hover:text-white"
+            onClick={onFullscreen}
+            size="icon-sm"
+            variant="ghost"
+          >
+            {fullscreen ? <Minimize2Icon className="size-3.5" /> : <Maximize2Icon className="size-3.5" />}
+          </Button>
+          <Button
+            aria-label="Close browser panel"
+            className="size-7 text-white/90 hover:bg-white/15 hover:text-white"
+            onClick={onClose}
+            size="icon-sm"
+            variant="ghost"
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );
