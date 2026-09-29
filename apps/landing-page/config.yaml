@@ -1,0 +1,6 @@
+siteTitle: "darwin: an agent that gets its own computer"
+authorName: "Himanshu Sardana"
+authorRole: "Builder of darwin"
+authorBio: "A self-hosted agent app built on eve: a microVM workspace, a live browser the agent drives while you watch, and a Next.js chat UI you host yourself."
+defaultTheme: "showcase"
+siteUrl: "https://darwin.himanshu.co"

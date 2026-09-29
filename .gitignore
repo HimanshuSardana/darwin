@@ -4,6 +4,7 @@ node_modules
 .vercel
 .next
 .output
+apps/landing-page/output/
 .nitro
 dist
 .DS_Store
