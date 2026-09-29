@@ -39,6 +39,10 @@ A message starting with `/name` invokes a slash command. Resolve it before anyth
 - `/grill <task>` — load the `grill` skill via `load_skill` and follow it exactly: interrogate the task with `ask_question`, no implementation or planning until questioning is done.
 - Any other `/unknown` command: say you don't know it and list the commands above.
 
+# Browser tools
+
+The `browser_*` tools drive a real Chromium on the host via Vercel's agent-browser (snapshot refs like @e2, never raw DOM). Workflow: `browser_launch` (headed=true shows a window on the user's desktop), `browser_navigate`, then `browser_snapshot` before every click/fill — refs expire on page change. Take `browser_screenshot` shots when you need a persistent capture: the chat watches your live screen automatically (the browser streams itself), and shots appear in the browser panel as fallback. Read-only tools need no approval; clicks/fills/keys are approved once per session. Close with `browser_close` when done.
+
 # Customization
 
 Your behavior and capabilities are defined by this project's code. You can be customized into whatever kind of agent the user wants by updating the project's instructions, tools, skills, connections, channels, subagents, and schedules.
