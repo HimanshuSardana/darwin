@@ -43,6 +43,17 @@ code{font-family:'Iosevka',ui-monospace,SFMono-Regular,Menlo,monospace;font-size
 .btn-solid:hover{opacity:.88}
 .btn-ghost{border:1px solid var(--ghost-border);color:var(--text)}
 .btn-ghost:hover{border-color:var(--faint)}
+/* screenshots bento */
+.shots{max-width:980px;margin:0 auto;padding:0 1.25rem}
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:1rem}
+.bento figure{margin:0;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--code-bg)}
+.bento figure.wide{grid-column:1/-1}
+.bento img{display:block;width:100%;height:auto}
+.bento figcaption{padding:.55rem .9rem;font-size:.78rem;color:var(--faint);border-top:1px solid var(--border)}
+.bento .only-light{display:none}
+[data-theme="light"] .only-light{display:block}
+[data-theme="light"] .only-dark{display:none}
+@media(max-width:640px){.bento{grid-template-columns:1fr}}
 /* sections */
 .sec-label{font-size:.85rem;color:var(--muted);margin:2.8rem 0 .8rem}
 .feat-list{list-style:none}
@@ -128,7 +139,29 @@ html.js .rv.in{opacity:1;transform:none}
 View on GitHub</a>
 <a class="btn btn-ghost" href="#quickstart">Quickstart</a>
 </div>
+</div>
 
+<div class="shots">
+<div class="bento">
+<figure class="wide">
+<img class="only-dark" src="shots/home-dark.png" alt="darwin chat home in dark mode" loading="eager" />
+<img class="only-light" src="shots/home-light.png" alt="darwin chat home in light mode" loading="eager" />
+<figcaption>Composer, workspaces, and plan/build modes</figcaption>
+</figure>
+<figure>
+<img class="only-dark" src="shots/chat-dark.png" alt="darwin running code in the microVM, dark mode" loading="lazy" />
+<img class="only-light" src="shots/chat-light.png" alt="darwin running code in the microVM, light mode" loading="lazy" />
+<figcaption>Writes and runs code inside the microVM</figcaption>
+</figure>
+<figure>
+<img class="only-dark" src="shots/workspace-dark.png" alt="spin up workspace dialog, dark mode" loading="lazy" />
+<img class="only-light" src="shots/workspace-light.png" alt="spin up workspace dialog, light mode" loading="lazy" />
+<figcaption>MicroVM or host directory, with packages</figcaption>
+</figure>
+</div>
+</div>
+
+<div class="wrap">
 <div class="sec-label" id="features">What you get</div>
 <ul class="feat-list">
 <li><b>microVM workspace</b>: every built-in shell command runs in an isolated lightweight VM rooted at <code>/workspace</code>, so nothing it does touches your machine</li>
@@ -369,7 +402,7 @@ window.__cmdkSections = [];
 (function(){
   var root = document.documentElement;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  var els = document.querySelectorAll('.sec-label, .feat-list, .cmd-box, .faq, footer.site');
+  var els = document.querySelectorAll('.sec-label, .feat-list, .cmd-box, .faq, .bento figure, footer.site');
   if (!els.length || !('IntersectionObserver' in window)) return;
   root.classList.add('js');
   var io = new IntersectionObserver(function(entries){
