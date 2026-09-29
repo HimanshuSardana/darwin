@@ -43,6 +43,19 @@ function relativeTime(timestamp: number): string {
   });
 }
 
+/** Small initial-letter avatar for sidebar rows. */
+function RowAvatar({ label }: { readonly label: string }) {
+  const initial = label.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span
+      aria-hidden="true"
+      className="bg-sidebar-accent text-sidebar-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-medium"
+    >
+      {initial}
+    </span>
+  );
+}
+
 export function ChatSidebar({
   activeId,
   activeWorkspaceId,
@@ -146,7 +159,7 @@ export function ChatSidebar({
                     <SidebarMenuItem key={workspaceRecord.id}>
                       <SidebarMenuButton
                         isActive={workspaceRecord.id === activeWorkspaceId}
-                        className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
+                        className="h-auto py-2.5 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground"
                         onClick={() => {
                           dismissMobileSheet();
                           onSelectWorkspace(
@@ -155,11 +168,12 @@ export function ChatSidebar({
                         }}
                         tooltip={workspaceRecord.name}
                       >
-                        <span>
+                        <RowAvatar label={workspaceRecord.name} />
+                        <span className="group-data-[collapsible=icon]:hidden">
                           <span className="block truncate font-normal">
                             {workspaceRecord.name}
                           </span>
-                          <span className="text-muted-foreground block text-[11px] group-hover/menu-item:opacity-0">
+                          <span className="text-muted-foreground block text-[11px]">
                             {workspaceRecord.provider === "host" ? "Host directory" : "MicroVM"}
                           </span>
                         </span>
@@ -205,7 +219,8 @@ export function ChatSidebar({
                       tooltip={session.title}
                       className="data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-has-data-[sidebar=menu-action]/menu-item:pr-2"
                     >
-                      <span className="min-w-0 flex-1 truncate font-normal text-sm">
+                      <RowAvatar label={session.title} />
+                      <span className="min-w-0 flex-1 truncate font-normal text-sm group-data-[collapsible=icon]:hidden">
                         {session.title}
                       </span>
                       <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-hover/menu-item:opacity-0">
