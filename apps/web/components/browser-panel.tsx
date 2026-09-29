@@ -31,7 +31,7 @@ export function BrowserPanel({
         "flex flex-col overflow-hidden bg-background",
         // Inside the resizable group the pane fills its slot; fullscreen
         // escapes layout as an overlay.
-        fullscreen ? "fixed inset-0 z-50" : "h-full min-h-0 w-full border-l",
+        fullscreen ? "fixed inset-0 z-50" : "h-full min-h-0 w-[560px] max-w-[85vw] shrink-0 border-l",
       )}
     >
       <div className="flex h-14 shrink-0 items-center gap-1 border-b px-3">

@@ -25,11 +25,6 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import { BrowserPanel } from "@/components/browser-panel";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { useBrowserStream } from "@/lib/use-browser-stream";
 import { ModeSelect } from "@/components/mode-select";
 import { SlashMenu } from "@/components/slash-menu";
@@ -476,29 +471,13 @@ export function AgentChat({
       ) : null}
 
       {embedded ? (
-        <ResizablePanelGroup className="min-h-0 flex-1" direction="horizontal">
-          <ResizablePanel
-            className="min-h-0"
-            defaultSize={browserOpen ? "62%" : "100%"}
-            id="chat"
-            minSize="30%"
-          >
-            <div className="flex min-h-0 min-w-0 h-full flex-col">
-              {conversationView}
-              {composerView}
-            </div>
-          </ResizablePanel>
+        <div className="flex min-h-0 flex-1 flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {conversationView}
+            {composerView}
+          </div>
           {browserOpen ? (
-            <>
-              <ResizableHandle withHandle />
-              <ResizablePanel
-                className="min-h-0"
-                defaultSize="38%"
-                id="browser"
-                maxSize="80%"
-                minSize="20%"
-              >
-                <BrowserPanel
+            <BrowserPanel
               fullscreen={browserFullscreen}
               live={browserStream.live}
               onClose={() => {
@@ -511,10 +490,8 @@ export function AgentChat({
               streamFrame={browserStream.frame}
               url={browserStream.url}
             />
-              </ResizablePanel>
-            </>
           ) : null}
-        </ResizablePanelGroup>
+        </div>
       ) : (
         <>
           {conversationView}
