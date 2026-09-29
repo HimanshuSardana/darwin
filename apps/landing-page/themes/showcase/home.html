@@ -43,17 +43,25 @@ code{font-family:'Iosevka',ui-monospace,SFMono-Regular,Menlo,monospace;font-size
 .btn-solid:hover{opacity:.88}
 .btn-ghost{border:1px solid var(--ghost-border);color:var(--text)}
 .btn-ghost:hover{border-color:var(--faint)}
-/* screenshots bento */
+/* screenshots carousel */
 .shots{max-width:980px;margin:0 auto;padding:0 1.25rem}
-.bento{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-bottom:1rem}
-.bento figure{margin:0;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--code-bg)}
-.bento figure.wide{grid-column:1/-1}
-.bento img{display:block;width:100%;height:auto}
-.bento figcaption{padding:.55rem .9rem;font-size:.78rem;color:var(--faint);border-top:1px solid var(--border)}
-.bento .only-light{display:none}
+.carousel{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--code-bg);margin-bottom:.8rem}
+.car-viewport{position:relative;overflow:hidden}
+.car-track{display:flex;transition:transform .45s cubic-bezier(.3,.7,.3,1)}
+.car-slide{flex:0 0 100%;min-width:0;margin:0}
+.car-slide img{display:block;width:100%;height:auto}
+.carousel .only-light{display:none}
 [data-theme="light"] .only-light{display:block}
 [data-theme="light"] .only-dark{display:none}
-@media(max-width:640px){.bento{grid-template-columns:1fr}}
+.car-btn{position:absolute;top:50%;transform:translateY(-50%);width:2.1rem;height:2.1rem;border-radius:99px;border:1px solid var(--border);background:rgba(0,0,0,.45);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:0}
+.car-btn:hover{border-color:var(--faint)}
+.car-prev{left:.8rem}
+.car-next{right:.8rem}
+.car-bar{display:flex;align-items:center;gap:.8rem;padding:.1rem .25rem;margin-bottom:1rem}
+.car-caption{margin:0;font-size:.78rem;color:var(--faint);flex:1;min-width:0}
+.car-dots{display:flex;gap:.45rem;flex-shrink:0}
+.car-dots button{width:.55rem;height:.55rem;border-radius:99px;border:1px solid var(--faint);background:transparent;cursor:pointer;padding:0}
+.car-dots button.on{background:var(--text);border-color:var(--text)}
 /* sections */
 .sec-label{font-size:.85rem;color:var(--muted);margin:2.8rem 0 .8rem}
 .feat-list{list-style:none}
@@ -142,22 +150,35 @@ View on GitHub</a>
 </div>
 
 <div class="shots">
-<div class="bento">
-<figure class="wide">
+<div id="shots-carousel">
+<div class="carousel">
+<div class="car-viewport">
+<div class="car-track" id="car-track">
+<div class="car-slide">
 <img class="only-dark" src="shots/home-dark.png" alt="darwin chat home in dark mode" loading="eager" />
 <img class="only-light" src="shots/home-light.png" alt="darwin chat home in light mode" loading="eager" />
-<figcaption>Composer, workspaces, and plan/build modes</figcaption>
-</figure>
-<figure>
+</div>
+<div class="car-slide">
 <img class="only-dark" src="shots/chat-dark.png" alt="darwin running code in the microVM, dark mode" loading="lazy" />
 <img class="only-light" src="shots/chat-light.png" alt="darwin running code in the microVM, light mode" loading="lazy" />
-<figcaption>Writes and runs code inside the microVM</figcaption>
-</figure>
-<figure>
+</div>
+<div class="car-slide">
 <img class="only-dark" src="shots/workspace-dark.png" alt="spin up workspace dialog, dark mode" loading="lazy" />
 <img class="only-light" src="shots/workspace-light.png" alt="spin up workspace dialog, light mode" loading="lazy" />
-<figcaption>MicroVM or host directory, with packages</figcaption>
-</figure>
+</div>
+</div>
+<button class="car-btn car-prev" aria-label="Previous screenshot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+<button class="car-btn car-next" aria-label="Next screenshot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+</div>
+</div>
+<div class="car-bar">
+<p class="car-caption" id="car-caption">Composer, workspaces, and plan/build modes</p>
+<div class="car-dots" id="car-dots">
+<button aria-label="Show screenshot 1" aria-current="true"></button>
+<button aria-label="Show screenshot 2"></button>
+<button aria-label="Show screenshot 3"></button>
+</div>
+</div>
 </div>
 </div>
 
@@ -402,7 +423,7 @@ window.__cmdkSections = [];
 (function(){
   var root = document.documentElement;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  var els = document.querySelectorAll('.sec-label, .feat-list, .cmd-box, .faq, .bento figure, footer.site');
+  var els = document.querySelectorAll('.sec-label, .feat-list, .cmd-box, .faq, .carousel, footer.site');
   if (!els.length || !('IntersectionObserver' in window)) return;
   root.classList.add('js');
   var io = new IntersectionObserver(function(entries){
@@ -411,6 +432,53 @@ window.__cmdkSections = [];
     });
   }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' });
   els.forEach(function(el){ el.classList.add('rv'); io.observe(el); });
+})();
+</script>
+
+<script>
+(function(){
+  var track = document.getElementById('car-track');
+  if (!track) return;
+  var box = document.getElementById('shots-carousel');
+  var bar = document.getElementById('car-caption');
+  var dots = Array.prototype.slice.call(document.querySelectorAll('#car-dots button'));
+  var captions = [
+    'Composer, workspaces, and plan/build modes',
+    'Writes and runs code inside the microVM',
+    'MicroVM or host directory, with packages'
+  ];
+  var n = track.children.length;
+  var i = 0, timer = null, tx = null;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function render(){
+    track.style.transform = 'translateX(-' + (i * 100) + '%)';
+    bar.textContent = captions[i] || '';
+    dots.forEach(function(d, k){
+      var on = k === i;
+      d.classList.toggle('on', on);
+      if (on) d.setAttribute('aria-current', 'true');
+      else d.removeAttribute('aria-current');
+    });
+  }
+  function restart(){
+    if (timer) { clearInterval(timer); timer = null; }
+    if (!reduce) timer = setInterval(function(){ i = (i + 1) % n; render(); }, 6000);
+  }
+  function go(k){ i = (k + n) % n; render(); restart(); }
+  Array.prototype.forEach.call(box.querySelectorAll('.car-prev'), function(b){ b.addEventListener('click', function(){ go(i - 1); }); });
+  Array.prototype.forEach.call(box.querySelectorAll('.car-next'), function(b){ b.addEventListener('click', function(){ go(i + 1); }); });
+  dots.forEach(function(d, k){ d.addEventListener('click', function(){ go(k); }); });
+  box.addEventListener('mouseenter', function(){ if (timer) { clearInterval(timer); timer = null; } });
+  box.addEventListener('mouseleave', restart);
+  box.addEventListener('touchstart', function(e){ tx = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener('touchend', function(e){
+    if (tx == null) return;
+    var dx = e.changedTouches[0].clientX - tx;
+    tx = null;
+    if (Math.abs(dx) > 40) go(i + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+  render();
+  restart();
 })();
 </script>
 </body>
