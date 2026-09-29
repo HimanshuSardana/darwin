@@ -1,14 +1,13 @@
 "use client";
 
-import { svgFromName } from "hiblob";
-import { useMemo } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Blobatar as BlobatarFigure } from "@blobatar/react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 /**
- * Deterministic blob avatar (hiblob): same seed string renders the same
- * SVG figure on every platform, byte for byte. Served as an encoded data
- * URI so it behaves like a regular image inside shadcn Avatar.
+ * Deterministic blobatar avatar (blobatar.dev): the same seed string
+ * renders the same geometric face everywhere, with nothing stored.
+ * Generated in-process — no network, no third-party calls.
  */
 export function BlobAvatar({
   seed,
@@ -19,14 +18,16 @@ export function BlobAvatar({
   readonly className?: string;
   readonly label?: string;
 }) {
-  const src = useMemo(() => {
-    const svg = svgFromName(seed.trim() || "user", { background: "squircle" });
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  }, [seed]);
-  const initial = (label ?? seed).trim().charAt(0).toUpperCase() || "?";
+  const name = seed.trim() || "user";
+  const initial = (label ?? name).trim().charAt(0).toUpperCase() || "?";
   return (
     <Avatar className={cn("size-8 rounded-lg", className)}>
-      <AvatarImage alt={label ?? seed} src={src} />
+      <BlobatarFigure
+        background="squircle"
+        className="size-full"
+        name={name}
+        title={label ?? name}
+      />
       <AvatarFallback className="rounded-lg">{initial}</AvatarFallback>
     </Avatar>
   );
