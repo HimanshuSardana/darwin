@@ -136,6 +136,7 @@ export function ChatSidebar({
   readonly onWorkspaceDialogSubmit: (input: {
     name: string;
     provider: WorkspaceProvider;
+    packages: string[];
   }) => Promise<void>;
 }) {
   // On mobile the sidebar is a Sheet overlay (separate openMobile state

@@ -211,13 +211,14 @@ export function ChatShell() {
   );
 
   const handleNewWorkspace = useCallback(
-    async (input: { name: string; provider: "microvm" | "host" }) => {
+    async (input: { name: string; provider: "microvm" | "host"; packages: string[] }) => {
       const sessionId =
         input.provider === "microvm" ? await createEveSession() : undefined;
       const { workspace: record } = await createWorkspace({
         name: input.name,
         provider: input.provider,
         sessionId,
+        packages: input.packages,
       });
       const { workspaces: fresh } = await listWorkspaces();
       setWorkspaces(fresh);

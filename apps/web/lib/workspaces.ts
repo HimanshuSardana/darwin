@@ -1,5 +1,7 @@
 "use client";
 
+import { catalogPackage } from "@/lib/packages";
+
 /** Named persistent workspace: an isolated microVM disk or a host directory. */
 export interface WorkspaceRecord {
   readonly id: string;
@@ -10,6 +12,8 @@ export interface WorkspaceRecord {
   readonly sessionId: string | null;
   /** Host directory for host workspaces. */
   readonly path: string | null;
+  /** Catalog package ids to ensure installed (microvm only). */
+  readonly packages: string[];
   readonly createdAt: number;
 }
 
@@ -33,6 +37,7 @@ export function createWorkspace(input: {
   name: string;
   provider: "microvm" | "host";
   sessionId?: string;
+  packages?: string[];
 }): Promise<{ workspace: WorkspaceRecord }> {
   return request("/api/workspaces", {
     method: "POST",
@@ -71,8 +76,22 @@ export function namedWorkspaceClientContext(
       `Do not touch files anywhere else on the host.`
     );
   }
-  return (
+  const base =
     `Active workspace "${workspace.name}": a persistent microVM whose /workspace ` +
-    `disk survives across sessions. Keep all project files there so work persists.`
+    `disk survives across sessions. Keep all project files there so work persists.`;
+  const wanted = (workspace.packages ?? [])
+    .map((id) => catalogPackage(id))
+    .filter((entry) => entry !== undefined);
+  if (wanted.length === 0) return base;
+  const setup = wanted
+    .map(
+      (entry) =>
+        `- ${entry.label}: if \`command -v ${entry.check}\` fails, run: ${entry.install}`,
+    )
+    .join("\n");
+  return (
+    `${base}\n` +
+    `SETUP: this workspace requires these packages inside the VM. On your FIRST turn ` +
+    `using it, probe each and install whatever is missing (run installs before other work):\n${setup}`
   );
 }
