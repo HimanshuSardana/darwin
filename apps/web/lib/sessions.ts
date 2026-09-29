@@ -52,19 +52,25 @@ export function titleFromMessage(text: string): string {
   return `${singleLine.slice(0, TITLE_MAX - 1).trimEnd()}…`;
 }
 
-/** Insert or refresh an entry; returns the new list (newest first). */
+/** Insert or refresh an entry; returns the new list (newest first).
+ * Pass touch:false when merely selecting: viewing must not reorder. */
 export function upsertSession(
   sessions: ChatSessionEntry[],
   userId: string,
   sessionId: string,
-  patch?: { readonly title?: string },
+  patch?: { readonly title?: string; readonly touch?: boolean },
 ): ChatSessionEntry[] {
   const now = Date.now();
+  const touch = patch?.touch ?? true;
   const existing = sessions.find((entry) => entry.sessionId === sessionId);
   const next: ChatSessionEntry[] = existing
     ? sessions.map((entry) =>
         entry.sessionId === sessionId
-          ? { ...entry, updatedAt: now, title: patch?.title ?? entry.title }
+          ? {
+              ...entry,
+              updatedAt: touch ? now : entry.updatedAt,
+              title: patch?.title ?? entry.title,
+            }
           : entry,
       )
     : [{ sessionId, title: patch?.title ?? "New chat", updatedAt: now }, ...sessions];

@@ -159,7 +159,7 @@ export function ChatSidebar({
                           <span className="block truncate font-normal">
                             {workspaceRecord.name}
                           </span>
-                          <span className="text-muted-foreground block text-[11px]">
+                          <span className="text-muted-foreground block text-[11px] group-hover/menu-item:opacity-0">
                             {workspaceRecord.provider === "host" ? "Host directory" : "MicroVM"}
                           </span>
                         </span>
@@ -208,7 +208,7 @@ export function ChatSidebar({
                       <span className="min-w-0 flex-1 truncate font-normal text-sm">
                         {session.title}
                       </span>
-                      <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-hover/menu-item:invisible">
+                      <span className="text-muted-foreground w-10 shrink-0 text-right text-xs tabular-nums group-hover/menu-item:opacity-0">
                         {relativeTime(session.updatedAt)}
                       </span>
                     </SidebarMenuButton>

@@ -131,7 +131,8 @@ export function ChatShell() {
       setActiveId(sessionId);
       setLiveSessionId(sessionId);
       if (userId) {
-        setSessions((previous) => upsertSession(previous, userId, sessionId));
+        // Viewing must not reorder: refresh the entry without touching time.
+        setSessions((previous) => upsertSession(previous, userId, sessionId, { touch: false }));
       }
     },
     [userId],
