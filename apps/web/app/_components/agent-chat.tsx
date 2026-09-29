@@ -213,22 +213,15 @@ export function AgentChat({
     () => (slashDismissed ? [] : matchSlashCommands(composerText)),
     [composerText, slashDismissed],
   );
-  useEffect(() => {
-    if (agent.status !== "submitted") {
-      setPendingSend(null);
-    }
-  }, [agent.status]);
-  const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
-  const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
-  const hasConversationContent = !isEmpty || errorMessage !== undefined;
   // Optimistic send state: jump to the chat view immediately on submit,
-  // showing the message muted + shimmering until the server confirms it.
-  // Cleared once the status leaves "submitted" (streaming/error) or the
-  // transcript grows past what_submit saw (covers optimistic projection).
+  // showing the message muted + shimmering until the transcript confirms
+  // it. Covers both gaps: session-create (status submitted) and model
+  // cold-start (streaming, but no messages yet).
   const [pendingSend, setPendingSend] = useState<string | null>(null);
-  // While the turn hasn't produced stream events yet, the last user message
-  // (optimistic or synthetic) renders muted with a Sending shimmer.
-  const isSending = agent.status === "submitted";
+  useEffect(() => {
+    setPendingSend(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent.session?.sessionId]);
   const lastUserIndex = (() => {
     const messages = agent.data.messages;
     for (let index = messages.length - 1; index >= 0; index--) {
@@ -236,8 +229,16 @@ export function AgentChat({
     }
     return -1;
   })();
-  const showSyntheticSend = isSending && lastUserIndex === -1 && pendingSend !== null;
-  const showConversationLayout = isResuming || hasConversationContent || isSending;
+  const turnLive = agent.status === "submitted" || agent.status === "streaming";
+  const showSyntheticSend =
+    pendingSend !== null && lastUserIndex === -1 && turnLive;
+  // Muted styling applies to a real optimistic bubble only pre-stream.
+  const isSending = agent.status === "submitted";
+  const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
+  const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
+  const hasConversationContent = !isEmpty || errorMessage !== undefined;
+  const showConversationLayout =
+    isResuming || hasConversationContent || showSyntheticSend || isSending;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
 
   const requestCancellation = () => {
@@ -324,7 +325,11 @@ export function AgentChat({
     }
 
     if (message.files.length === 0) {
-      await agent.send(text, options);
+      try {
+        await agent.send(text, options);
+      } catch {
+        setPendingSend(null);
+      }
       return;
     }
 
@@ -341,7 +346,11 @@ export function AgentChat({
       });
     }
 
-    await agent.send(parts, options);
+    try {
+      await agent.send(parts, options);
+    } catch {
+      setPendingSend(null);
+    }
   };
 
   const conversationView = !showConversationLayout ? null : (
