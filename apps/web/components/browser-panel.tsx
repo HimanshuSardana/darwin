@@ -64,11 +64,12 @@ export function BrowserPanel({
           <XIcon className="size-4" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden bg-muted/30 p-3">
+      <div className="relative min-h-0 flex-1 bg-muted/30">
         {src ? (
           live ? (
-            // Live view never scrolls: contain the frame in the pane.
-            <div className="flex h-full items-center justify-center">
+            // Live view is absolutely centered: immune to ancestor height
+            // quirks, never scrolls, always fills the pane.
+            <div className="absolute inset-0 flex items-center justify-center p-3">
               <img
                 alt="Live browser view"
                 className="max-h-full max-w-full rounded-lg border bg-background object-contain shadow-sm"
@@ -76,7 +77,7 @@ export function BrowserPanel({
               />
             </div>
           ) : (
-            <div className="h-full overflow-auto">
+            <div className="absolute inset-0 overflow-auto p-3">
               <img
                 alt="Last browser screenshot"
                 className="h-auto w-full rounded-lg border bg-background shadow-sm"
@@ -86,7 +87,7 @@ export function BrowserPanel({
             </div>
           )
         ) : (
-          <div className="flex h-full min-h-48 flex-col items-center justify-center gap-2 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center">
             <MonitorIcon className="text-muted-foreground size-8" />
             <p className="text-muted-foreground max-w-55 text-sm">
               No browser yet. Ask the agent to open a page.
