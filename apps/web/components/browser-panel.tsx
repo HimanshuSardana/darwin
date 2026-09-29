@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { Maximize2Icon, Minimize2Icon, MonitorIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -57,8 +58,11 @@ export function BrowserPanel({
   // the nearest transformed/filtered ancestor, and app chrome (sidebars,
   // animated containers) can trap it. The portal guarantees viewport fill.
   const window_ = (
-    <div
+    <motion.div
       ref={frameRef}
+      initial={{ opacity: 0, scale: 0.94, y: fullscreen ? 0 : 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 380, damping: 32 }}
       // Fullscreen ignores drag position entirely: any leftover left/top
       // inline style would beat inset-0 and pin the window off-origin.
       style={fullscreen ? undefined : pos ? { left: pos.x, top: pos.y } : { top: 72, right: 16 }}
@@ -71,8 +75,7 @@ export function BrowserPanel({
         fullscreen ? "fixed inset-0 z-50" : "fixed z-40 w-[440px] max-w-[90vw]",
       )}
     >
-      <div className="relative aspect-video w-full touch-none bg-muted/30">
-        {src ? (
+      <div className="relative aspect-video w-full touch-none bg-muted/30">        {src ? (
           live ? (
             <img
               alt="Live browser view"
@@ -143,7 +146,7 @@ export function BrowserPanel({
           </Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
   if (fullscreen && typeof document !== "undefined") {
     return createPortal(window_, document.body);

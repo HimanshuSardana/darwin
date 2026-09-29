@@ -3,6 +3,7 @@
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
 import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, ListChecksIcon, PanelRightIcon, PlusIcon, SquareIcon } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Conversation,
@@ -40,6 +41,7 @@ import {
 import { workspaceClientContext, type Workspace } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
+import { useSession } from "@/lib/auth-client";
 import { WEB_CHAT_AGENT } from "@/app/eve-agent";
 
 const DEFAULT_AGENT_NAME = "eve-agent";
@@ -83,6 +85,11 @@ export function AgentChat({
   readonly namedWorkspaceContext?: string | null;
   readonly sessionId?: string;
 }) {
+  const { data: authSession } = useSession();
+  const firstName =
+    authSession?.user?.name?.trim().split(/\s+/)[0] ||
+    authSession?.user?.email?.split("@")[0] ||
+    "there";
   const [cancellationError, setCancellationError] = useState<string>();
   const [hasInputText, setHasInputText] = useState(false);
   const titledSessionRef = useRef<string | null>(null);
@@ -206,10 +213,23 @@ export function AgentChat({
     () => (slashDismissed ? [] : matchSlashCommands(composerText)),
     [composerText, slashDismissed],
   );
+  useEffect(() => {
+    if (agent.status !== "submitted") {
+      setPendingSend(null);
+    }
+  }, [agent.status]);
   const turnFailure = isBusy || isResuming ? undefined : getLatestTurnFailure(agent.events);
   const errorMessage = cancellationError ?? agent.error?.message ?? turnFailure;
   const hasConversationContent = !isEmpty || errorMessage !== undefined;
-  const showConversationLayout = isResuming || hasConversationContent;
+  // Optimistic send state: jump to the chat view immediately on submit,
+  // showing the message muted + shimmering until the server confirms it.
+  // Cleared once the status leaves "submitted" (streaming/error) or the
+  // transcript grows past what_submit saw (covers optimistic projection).
+  const [pendingSend, setPendingSend] = useState<string | null>(null);
+  const messageCountAtSubmitRef = useRef(0);
+  const showSyntheticSend =
+    pendingSend !== null && agent.data.messages.length <= messageCountAtSubmitRef.current;
+  const showConversationLayout = isResuming || hasConversationContent || showSyntheticSend;
   const activeSessionId = sessionId ?? agent.session?.sessionId;
 
   const requestCancellation = () => {
@@ -289,6 +309,12 @@ export function AgentChat({
       titledSessionRef.current = sessionId ?? "new";
       onFirstMessageRef.current?.(text);
     }
+    // Arm the optimistic sending state *after* slash handling, right before
+    // the turn actually dispatches (bare mode-switches return early above).
+    messageCountAtSubmitRef.current = agent.data.messages.length;
+    if (text.length > 0) {
+      setPendingSend(text);
+    }
 
     if (message.files.length === 0) {
       await agent.send(text, options);
@@ -312,7 +338,13 @@ export function AgentChat({
   };
 
   const conversationView = !showConversationLayout ? null : (
-        <Conversation
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="contents"
+    >
+      <Conversation
           className="min-h-0 flex-1"
           initial={sessionId === undefined ? undefined : false}
           resize={activeSessionId === undefined ? "smooth" : "instant"}
@@ -347,11 +379,29 @@ export function AgentChat({
                 />
               ),
             )}
+            {showSyntheticSend && pendingSend ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="flex justify-end"
+              >
+                <div className="flex max-w-[85%] flex-col items-end gap-1">
+                  <div className="bg-muted text-muted-foreground rounded-2xl rounded-br-md px-4 py-2.5 text-sm whitespace-pre-wrap">
+                    {pendingSend}
+                  </div>
+                  <div className="text-muted-foreground pr-1 text-xs">
+                    <Shimmer duration={1.2}>Sending…</Shimmer>
+                  </div>
+                </div>
+              </motion.div>
+            ) : null}
             {showPendingThinking ? <PendingThinking /> : null}
             {errorMessage ? <ErrorMessage message={errorMessage} /> : null}
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
+    </motion.div>
   );
 
   const composer = (
@@ -398,7 +448,9 @@ export function AgentChat({
   );
 
   const composerView = (
-    <div
+    <motion.div
+      layout
+      transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
       className={cn(
         "w-full px-4 sm:px-6",
         showConversationLayout
@@ -410,9 +462,18 @@ export function AgentChat({
       )}
     >
       {showConversationLayout ? null : (
-        <div className="flex flex-col items-center gap-3 text-center">
-          <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key="hero"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="flex flex-col items-center gap-3 text-center"
+          >
+            <h1 className="font-medium text-5xl tracking-tighter">Hello, {firstName}</h1>
+          </motion.div>
+        </AnimatePresence>
       )}
       <div className="relative w-full">
         {slashMatches.length > 0 ? (
@@ -450,7 +511,7 @@ export function AgentChat({
         ) : null}
         {composer}
       </div>
-    </div>
+    </motion.div>
   );
 
   return (
