@@ -1,5 +1,6 @@
 "use client";
 
+import { MotionConfig } from "motion/react";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { AgentChat } from "@/app/_components/agent-chat";
 import { ChatSidebar } from "@/components/chat-sidebar";
@@ -235,6 +236,7 @@ export function ChatShell() {
         workspaces={workspaces}
       />
       <SidebarInset>
+        <MotionConfig reducedMotion="user">
         <div className="pointer-events-none fixed top-3 left-4 z-30 md:hidden">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -261,6 +263,7 @@ export function ChatShell() {
           namedWorkspaceContext={namedWorkspaceClientContext(activeWorkspace)}
           sessionId={activeId ?? undefined}
         />
+        </MotionConfig>
       </SidebarInset>
     </SidebarProvider>
   );

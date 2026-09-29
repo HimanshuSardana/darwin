@@ -319,7 +319,13 @@ export function AgentChat({
   };
 
   const conversationView = !showConversationLayout ? null : (
-        <Conversation
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="contents"
+    >
+      <Conversation
           className="min-h-0 flex-1"
           initial={sessionId === undefined ? undefined : false}
           resize={activeSessionId === undefined ? "smooth" : "instant"}
@@ -359,6 +365,7 @@ export function AgentChat({
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
+    </motion.div>
   );
 
   const composer = (
@@ -419,9 +426,18 @@ export function AgentChat({
       )}
     >
       {showConversationLayout ? null : (
-        <div className="flex flex-col items-center gap-3 text-center">
-          <h1 className="font-medium text-5xl tracking-tighter">{AGENT_NAME}</h1>
-        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key="hero"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="flex flex-col items-center gap-3 text-center"
+          >
+            <h1 className="font-medium text-5xl tracking-tighter">Hello, {firstName}</h1>
+          </motion.div>
+        </AnimatePresence>
       )}
       <div className="relative w-full">
         {slashMatches.length > 0 ? (
