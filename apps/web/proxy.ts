@@ -8,7 +8,22 @@ const PUBLIC_PATHS = ["/signin", "/signup"];
  * never from the incoming Host header, which is attacker-controlled and
  * would turn the forwarded session cookie into an SSRF credential leak.
  */
-const INTERNAL_ORIGIN = process.env.INTERNAL_ORIGIN ?? "http://127.0.0.1:3000";
+const INTERNAL_ORIGIN = (() => {
+  const configured = process.env.INTERNAL_ORIGIN ?? "http://127.0.0.1:3000";
+  let parsed: URL;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error("Invalid INTERNAL_ORIGIN: " + configured);
+  }
+  const host = parsed.hostname.toLowerCase();
+  const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  if (parsed.protocol !== "https:" && !loopback) {
+    throw new Error("Refusing non-local INTERNAL_ORIGIN: " + configured);
+  }
+  return configured;
+})();
+
 
 async function checkAccess(cookie: string, sessionId?: string): Promise<boolean> {
   const accessUrl = new URL("/api/internal/access", INTERNAL_ORIGIN);
