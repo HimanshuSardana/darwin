@@ -1,7 +1,6 @@
 "use client";
 
-import { CheckIcon, ContainerIcon, FolderPlusIcon, LaptopIcon, LayersIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { CheckIcon, FolderPlusIcon, LayersIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,13 +14,11 @@ import { cn } from "@/lib/utils";
 /** Menu row with a right-side tick instead of the radio dot. */
 function WorkspacePickerItem({
   description,
-  icon,
   onSelect,
   selected,
   title,
 }: {
   readonly description: string;
-  readonly icon?: ReactNode;
   readonly onSelect: () => void;
   readonly selected: boolean;
   readonly title: string;
@@ -29,7 +26,6 @@ function WorkspacePickerItem({
   return (
     <DropdownMenuItem onSelect={onSelect}>
       <span className="flex min-w-0 flex-1 items-start gap-2 py-0.5">
-        {icon}
         <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
           <span className="text-xs">{title}</span>
           <span className="text-muted-foreground text-[11px]">{description}</span>
@@ -56,7 +52,7 @@ export function WorkspacePicker({
   readonly value: WorkspaceRecord | null;
   readonly workspaces: readonly WorkspaceRecord[];
 }) {
-  const Icon = !value ? LayersIcon : value.provider === "host" ? LaptopIcon : ContainerIcon;
+  const Icon = LayersIcon;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -87,12 +83,10 @@ export function WorkspacePicker({
           title="No workspace"
         />
         {workspaces.map((workspace) => {
-          const OptionIcon = workspace.provider === "host" ? LaptopIcon : ContainerIcon;
           return (
             <WorkspacePickerItem
               key={workspace.id}
               description={workspace.provider === "host" ? "Host directory" : "MicroVM"}
-              icon={<OptionIcon className="mt-0.5 size-3.5 shrink-0" />}
               onSelect={() => onChange(workspace)}
               selected={value?.id === workspace.id}
               title={workspace.name}

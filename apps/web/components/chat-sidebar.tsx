@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, ContainerIcon, LaptopIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { BotIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -109,7 +109,7 @@ export function ChatSidebar({
     onNew();
   };
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar variant="floating" collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -142,8 +142,6 @@ export function ChatSidebar({
             {workspaces.length === 0 ? null : (
               <SidebarMenu>
                 {workspaces.map((workspaceRecord) => {
-                  const Icon =
-                    workspaceRecord.provider === "host" ? LaptopIcon : ContainerIcon;
                   return (
                     <SidebarMenuItem key={workspaceRecord.id}>
                       <SidebarMenuButton
@@ -157,7 +155,6 @@ export function ChatSidebar({
                         }}
                         tooltip={workspaceRecord.name}
                       >
-                        <Icon />
                         <span>
                           <span className="block truncate font-normal">
                             {workspaceRecord.name}
