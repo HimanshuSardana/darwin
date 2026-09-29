@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, ContainerIcon, LaptopIcon, MessageSquareTextIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { BotIcon, ContainerIcon, LaptopIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -31,13 +31,16 @@ import { WorkspaceDialog } from "@/components/workspace-dialog";
 function relativeTime(timestamp: number): string {
   const deltaMs = Date.now() - timestamp;
   const minutes = Math.floor(deltaMs / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
+  if (days < 7) return `${days}d`;
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function ChatSidebar({
@@ -199,14 +202,11 @@ export function ChatSidebar({
                       onClick={() => handleSelect(session.sessionId)}
                       tooltip={session.title}
                     >
-                      <MessageSquareTextIcon />
-                      <span>
-                        <span className="block truncate font-normal">
-                          {session.title}
-                        </span>
-                        <span className="text-muted-foreground block text-[11px]">
-                          {relativeTime(session.updatedAt)}
-                        </span>
+                      <span className="min-w-0 flex-1 truncate font-normal text-sm">
+                        {session.title}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                        {relativeTime(session.updatedAt)}
                       </span>
                     </SidebarMenuButton>
                     <SidebarMenuAction
