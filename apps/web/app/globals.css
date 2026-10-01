@@ -72,6 +72,16 @@
   color: var(--foreground);
 }
 
+/* Payload code blocks: wrap long lines (shiki's pre doesn't) and keep
+   the expand toggle small. Plain CSS so app chrome always wins. */
+.payload-code pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.payload-toggle {
+  font-size: 11px;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
