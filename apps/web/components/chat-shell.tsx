@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { useSearchParams } from "next/navigation";
 import { AgentChat } from "@/app/_components/agent-chat";
 import { ChatSidebar } from "@/components/chat-sidebar";
+import { ObservabilityDrawer } from "@/components/observability/observability-drawer";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Tooltip,
@@ -60,6 +61,7 @@ export function ChatShell() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceRecord | null>(null);
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [observabilityOpen, setObservabilityOpen] = useState(false);
   // Deep-link jump (e.g. from Observability's "Open in chat"): applied once
   // after the registry loads so it never hijacks later navigation.
   const searchParams = useSearchParams();
@@ -301,6 +303,7 @@ export function ChatShell() {
             if (sessionId) touchSession(sessionId);
           }}
           onRequestNewChat={handleNew}
+          onOpenObservability={() => setObservabilityOpen(true)}
           onSessionChange={handleSessionChange}
           reasoningEffort={reasoningEffort}
           reasoningOnChange={handleReasoningChange}
@@ -313,6 +316,10 @@ export function ChatShell() {
           modeOnChange={handleModeChange}
           namedWorkspaceContext={namedWorkspaceClientContext(activeWorkspace)}
           sessionId={activeId ?? undefined}
+        />
+        <ObservabilityDrawer
+          onOpenChange={setObservabilityOpen}
+          open={observabilityOpen}
         />
         </MotionConfig>
       </SidebarInset>

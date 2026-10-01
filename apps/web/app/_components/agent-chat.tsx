@@ -2,7 +2,7 @@
 
 import type { UserContent } from "ai";
 import { useEveAgent } from "eve/react";
-import { AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, GlobeIcon, ListChecksIcon, PlusIcon, SquareIcon } from "lucide-react";
+import { ActivityIcon, AlertCircleIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon, GlobeIcon, ListChecksIcon, PlusIcon, SquareIcon } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -54,6 +54,7 @@ export function AgentChat({
   onMessageSent,
   onFirstMessage,
   onRequestNewChat,
+  onOpenObservability,
   onSessionChange,
   reasoningEffort = "provider-default",
   reasoningOnChange,
@@ -76,6 +77,8 @@ export function AgentChat({
   readonly onFirstMessage?: (text: string) => void;
   /** Override the header "New chat" action (shell switches panes instead). */
   readonly onRequestNewChat?: () => void;
+  /** Show the header Observability action (shell opens the drawer). */
+  readonly onOpenObservability?: () => void;
   /** Every durable session cursor the hook settles on. */
   readonly onSessionChange?: (session: { readonly sessionId: string }) => void;
   /** Composer reasoning effort; sent as ephemeral turn context. */
@@ -581,6 +584,7 @@ export function AgentChat({
         <ChatHeader
           canStartNewChat={activeSessionId !== undefined}
           embedded={embedded}
+          onOpenObservability={onOpenObservability}
           onRequestNewChat={onRequestNewChat}
         />
       ) : null}
@@ -658,10 +662,12 @@ function ErrorMessage({ message }: { readonly message: string }) {
 function ChatHeader({
   canStartNewChat,
   embedded,
+  onOpenObservability,
   onRequestNewChat,
 }: {
   readonly canStartNewChat: boolean;
   readonly embedded: boolean;
+  readonly onOpenObservability?: () => void;
   readonly onRequestNewChat?: () => void;
 }) {
   return (
@@ -673,6 +679,19 @@ function ChatHeader({
     >
       <div className="relative mx-auto flex h-full w-full max-w-3xl items-center justify-center bg-background px-24">
         <span className="truncate text-muted-foreground text-sm">{AGENT_NAME}</span>
+        {onOpenObservability ? (
+          <Button
+            aria-label="Open observability"
+            className="pointer-events-auto fixed top-3 right-28 pr-4"
+            onClick={onOpenObservability}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            <ActivityIcon className="size-4" />
+            <span className="hidden font-normal text-sm sm:inline">Observability</span>
+          </Button>
+        ) : null}
         {canStartNewChat ? (
           <Button
             aria-label="Start a new chat"
