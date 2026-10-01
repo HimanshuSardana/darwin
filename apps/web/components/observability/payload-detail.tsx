@@ -119,11 +119,31 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
         </span>
       </div>
       <Tabs defaultValue="messages">
-        <TabsList>
-          <TabsTrigger value="messages">Messages ({messages.length})</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
-          <TabsTrigger value="output">Output</TabsTrigger>
-          <TabsTrigger value="raw">Raw</TabsTrigger>
+        <TabsList className="gap-1 bg-transparent p-0">
+          <TabsTrigger
+            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            value="messages"
+          >
+            Messages ({messages.length})
+          </TabsTrigger>
+          <TabsTrigger
+            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            value="system"
+          >
+            System
+          </TabsTrigger>
+          <TabsTrigger
+            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            value="output"
+          >
+            Output
+          </TabsTrigger>
+          <TabsTrigger
+            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            value="raw"
+          >
+            Raw
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="messages">
           <div className="flex flex-col gap-2">
