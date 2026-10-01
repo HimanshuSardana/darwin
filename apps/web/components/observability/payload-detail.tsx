@@ -120,12 +120,9 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
           finish: {span.attrs["ai.response.finish_reason"]?.toString() ?? "?"}
         </span>
       </div>
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="border-border h-8 gap-0.5 rounded-none border-b bg-transparent p-0">
-          <TabsTrigger
-            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            value="messages"
-          >
+      <Tabs value={tab} onValueChange={setTab} className="payload-tabs">
+        <TabsList>
+          <TabsTrigger value="messages">
             Messages ({messages.length})
             {tab === "messages" ? (
               <motion.span
@@ -135,10 +132,7 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
               />
             ) : null}
           </TabsTrigger>
-          <TabsTrigger
-            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            value="system"
-          >
+          <TabsTrigger value="system">
             System
             {tab === "system" ? (
               <motion.span
@@ -148,10 +142,7 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
               />
             ) : null}
           </TabsTrigger>
-          <TabsTrigger
-            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            value="output"
-          >
+          <TabsTrigger value="output">
             Output
             {tab === "output" ? (
               <motion.span
@@ -161,10 +152,7 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
               />
             ) : null}
           </TabsTrigger>
-          <TabsTrigger
-            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            value="raw"
-          >
+          <TabsTrigger value="raw">
             Raw
             {tab === "raw" ? (
               <motion.span
