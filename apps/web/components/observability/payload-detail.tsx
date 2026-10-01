@@ -74,7 +74,7 @@ export function TextBlock({ text }: { readonly text: unknown }) {
     <div>
       {content}
       <button
-        className="text-muted-foreground hover:text-foreground mt-1 text-xs underline"
+        className="payload-toggle text-muted-foreground hover:text-foreground mt-1 text-xs underline"
         onClick={() => setExpanded((open) => !open)}
         type="button"
       >
