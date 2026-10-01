@@ -1,7 +1,8 @@
 "use client";
 
 import { MotionConfig } from "motion/react";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useSearchParams } from "next/navigation";
 import { AgentChat } from "@/app/_components/agent-chat";
 import { ChatSidebar } from "@/components/chat-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -59,6 +60,10 @@ export function ChatShell() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceRecord | null>(null);
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  // Deep-link jump (e.g. from Observability's "Open in chat"): applied once
+  // after the registry loads so it never hijacks later navigation.
+  const searchParams = useSearchParams();
+  const jumpRef = useRef(false);
 
   // Per-user session registry: load this user's list, claim each server-side
   // (first writer wins), and drop anything owned by someone else — e.g.
@@ -77,13 +82,22 @@ export function ChatShell() {
     void Promise.all(local.map((entry) => claimSession(entry.sessionId))).then(
       (results) => {
         if (cancelled) return;
-        setSessions(local.filter((_, index) => results[index] === true));
+        const owned = local.filter((_, index) => results[index] === true);
+        setSessions(owned);
+        if (!jumpRef.current) {
+          jumpRef.current = true;
+          const target = searchParams.get("session");
+          if (target && owned.some((entry) => entry.sessionId === target)) {
+            setActiveId(target);
+            setLiveSessionId(target);
+          }
+        }
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [searchParams, userId]);
 
   const handleSessionChange = useCallback(
     (session: { readonly sessionId: string }) => {
