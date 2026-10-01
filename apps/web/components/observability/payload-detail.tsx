@@ -152,7 +152,7 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
   const inputTokens = span.attrs["gen_ai.usage.input_tokens"] ?? span.attrs["agent.usage.input_tokens"];
   const outputTokens = span.attrs["gen_ai.usage.output_tokens"] ?? span.attrs["agent.usage.output_tokens"];
   return (
-    <div className="flex flex-col gap-3 px-3 py-3">
+    <div className="flex flex-col gap-3 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Badge>{span.attrs["gen_ai.request.model"]?.toString() ?? "model"}</Badge>
         {typeof inputTokens === "number" ? (
