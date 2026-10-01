@@ -145,8 +145,22 @@ function summarize(id: string, spans: TraceSpan[]): TraceSummary | null {
   };
 }
 
+export interface ModelCallSummary {
+  readonly traceId: string;
+  readonly spanId: string;
+  readonly title: string | null;
+  readonly sessionId: string | null;
+  readonly model: string | null;
+  readonly startNs: number;
+  readonly endNs: number;
+  readonly inputTokens: number | null;
+  readonly outputTokens: number | null;
+  readonly finishReason: string | null;
+}
+
 // Tiny in-memory cache: traces only grow, so a short TTL keeps the list fast.
 let cache: { at: number; summaries: TraceSummary[] } | null = null;
+let callsCache: { at: number; calls: ModelCallSummary[] } | null = null;
 const CACHE_TTL_MS = 5000;
 
 export async function listTraces(): Promise<TraceSummary[]> {
@@ -183,4 +197,36 @@ export async function getTrace(id: string): Promise<TraceSpan[] | null> {
   if (!/^[0-9a-f]{16,64}$/.test(id)) return null;
   const spans = await readTraceSpans(id);
   return spans.length > 0 ? spans : null;
+}
+
+/** Flattened model calls across recent traces, newest first. */
+export async function listModelCalls(limit: number): Promise<ModelCallSummary[]> {
+  if (callsCache && Date.now() - callsCache.at < CACHE_TTL_MS) {
+    return callsCache.calls.slice(0, limit);
+  }
+  const summaries = await listTraces();
+  const calls: ModelCallSummary[] = [];
+  for (const summary of summaries) {
+    const spans = await readTraceSpans(summary.id);
+    for (const span of spans) {
+      if (!span.name.startsWith("chat ")) continue;
+      const input = span.attrs["gen_ai.usage.input_tokens"];
+      const output = span.attrs["gen_ai.usage.output_tokens"];
+      calls.push({
+        traceId: summary.id,
+        spanId: span.spanId,
+        title: summary.title,
+        sessionId: summary.sessionId,
+        model: span.attrs["gen_ai.request.model"]?.toString() ?? null,
+        startNs: span.startNs,
+        endNs: span.endNs,
+        inputTokens: typeof input === "number" ? input : null,
+        outputTokens: typeof output === "number" ? output : null,
+        finishReason: span.attrs["ai.response.finish_reason"]?.toString() ?? null,
+      });
+    }
+  }
+  calls.sort((a, b) => b.startNs - a.startNs);
+  callsCache = { at: Date.now(), calls };
+  return calls.slice(0, limit);
 }
