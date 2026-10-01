@@ -320,6 +320,7 @@ export function ChatShell() {
         <ObservabilityDrawer
           onOpenChange={setObservabilityOpen}
           open={observabilityOpen}
+          sessionId={activeId ?? liveSessionId}
         />
         </MotionConfig>
       </SidebarInset>
