@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createHighlighter, type Highlighter } from "shiki";
 import { ChevronDownIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,18 +14,65 @@ import {
 } from "@/lib/observability";
 import { cn } from "@/lib/utils";
 
+let highlighterPromise: Promise<Highlighter> | null = null;
+
+function getHighlighter(): Promise<Highlighter> {
+  highlighterPromise ??= createHighlighter({ themes: ["github-dark"], langs: ["json"] });
+  return highlighterPromise;
+}
+
+/** JSON payloads get github-dark highlighting (same as chat code blocks). */
+function HighlightedJson({ code }: { readonly code: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (code.length > 100_000) return;
+    void getHighlighter()
+      .then((highlighter) => {
+        if (!cancelled) {
+          setHtml(highlighter.codeToHtml(code, { lang: "json", theme: "github-dark" }));
+        }
+      })
+      .catch(() => {
+        // Fall through to the plain rendering below.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+  if (!html) {
+    return <pre className="whitespace-pre-wrap font-mono text-xs break-words">{code}</pre>;
+  }
+  return (
+    <div
+      className="payload-code text-xs [&_pre]:bg-transparent! [&_pre]:p-0!"
+      // Shiki output is escaped HTML, never user markup.
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
 export function TextBlock({ text }: { readonly text: unknown }) {
   const body = typeof text === "string" ? text : JSON.stringify(text, null, 2) ?? "(empty)";
   const [expanded, setExpanded] = useState(false);
   const limit = 1200;
-  if (body.length <= limit) {
-    return <pre className="whitespace-pre-wrap font-mono text-xs break-words">{body}</pre>;
+  const shown = expanded ? body : body.slice(0, limit);
+  let isJson = false;
+  try {
+    const parsed = JSON.parse(body);
+    isJson = typeof parsed === "object" && parsed !== null;
+  } catch {
+    isJson = false;
   }
+  const content = isJson ? (
+    <HighlightedJson code={shown} />
+  ) : (
+    <pre className="whitespace-pre-wrap font-mono text-xs break-words">{shown}</pre>
+  );
+  if (body.length <= limit) return content;
   return (
     <div>
-      <pre className="whitespace-pre-wrap font-mono text-xs break-words">
-        {expanded ? body : `${body.slice(0, limit)}…`}
-      </pre>
+      {content}
       <button
         className="text-muted-foreground hover:text-foreground mt-1 text-xs underline"
         onClick={() => setExpanded((open) => !open)}
