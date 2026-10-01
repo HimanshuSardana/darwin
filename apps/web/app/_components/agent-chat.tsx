@@ -45,7 +45,7 @@ import { AgentMessage } from "./agent-message";
 import { useSession } from "@/lib/auth-client";
 import { WEB_CHAT_AGENT } from "@/app/eve-agent";
 
-const DEFAULT_AGENT_NAME = "eve-agent";
+const DEFAULT_AGENT_NAME = "darwin";
 const AGENT_NAME = WEB_CHAT_AGENT ?? DEFAULT_AGENT_NAME;
 
 export function AgentChat({
@@ -682,7 +682,7 @@ function ChatHeader({
         {onOpenObservability ? (
           <Button
             aria-label="Open observability"
-            className="pointer-events-auto fixed top-3 right-28 pr-4"
+            className="pointer-events-auto fixed top-3 right-36 pr-4"
             onClick={onOpenObservability}
             size="sm"
             type="button"

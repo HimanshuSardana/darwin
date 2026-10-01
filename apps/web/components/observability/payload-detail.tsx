@@ -11,23 +11,24 @@ import {
 } from "@/lib/observability";
 import { cn } from "@/lib/utils";
 
-export function TextBlock({ text }: { readonly text: string }) {
+export function TextBlock({ text }: { readonly text: unknown }) {
+  const body = typeof text === "string" ? text : JSON.stringify(text, null, 2) ?? "(empty)";
   const [expanded, setExpanded] = useState(false);
   const limit = 1200;
-  if (text.length <= limit) {
-    return <pre className="whitespace-pre-wrap font-mono text-xs break-words">{text}</pre>;
+  if (body.length <= limit) {
+    return <pre className="whitespace-pre-wrap font-mono text-xs break-words">{body}</pre>;
   }
   return (
     <div>
       <pre className="whitespace-pre-wrap font-mono text-xs break-words">
-        {expanded ? text : `${text.slice(0, limit)}…`}
+        {expanded ? body : `${body.slice(0, limit)}…`}
       </pre>
       <button
         className="text-muted-foreground hover:text-foreground mt-1 text-xs underline"
         onClick={() => setExpanded((open) => !open)}
         type="button"
       >
-        {expanded ? "Show less" : `Show all (${text.length.toLocaleString()} chars)`}
+        {expanded ? "Show less" : `Show all (${body.length.toLocaleString()} chars)`}
       </button>
     </div>
   );
