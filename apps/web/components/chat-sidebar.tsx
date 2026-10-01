@@ -1,7 +1,6 @@
 "use client";
 
-import { ActivityIcon, BotIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import Link from "next/link";
+import { BotIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -190,14 +189,6 @@ export function ChatSidebar({
                   <span className="truncate text-xs">Agent harness</span>
                 </div>
               </SidebarMenuButton>
-              <Link
-                aria-label="Observability"
-                className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex size-7 shrink-0 items-center justify-center rounded-md transition-colors outline-none focus-visible:ring-2"
-                href="/observability"
-                title="Observability"
-              >
-                <ActivityIcon className="size-4" />
-              </Link>
               <SidebarTrigger className="shrink-0" />
             </div>
           </SidebarMenuItem>
