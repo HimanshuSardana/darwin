@@ -31,9 +31,12 @@ import { cn } from "@/lib/utils";
 export function ObservabilityDrawer({
   onOpenChange,
   open,
+  sessionId,
 }: {
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
+  /** Active chat session; when absent the drawer explains there's nothing to show. */
+  readonly sessionId?: string | null;
 }) {
   const [calls, setCalls] = useState<ModelCallSummary[] | null>(null);
   const [selected, setSelected] = useState<ModelCallSummary | null>(null);
@@ -44,7 +47,8 @@ export function ObservabilityDrawer({
     if (!open) return;
     let cancelled = false;
     setError(null);
-    void fetchModelCalls(50)
+    setCalls(null);
+    void fetchModelCalls(50, sessionId ?? undefined)
       .then((body) => {
         if (!cancelled) setCalls(body.calls);
       })
@@ -54,7 +58,7 @@ export function ObservabilityDrawer({
     return () => {
       cancelled = true;
     };
-  }, [open ]);
+  }, [open, sessionId]);
 
   useEffect(() => {
     if (!open) {
@@ -101,7 +105,7 @@ export function ObservabilityDrawer({
               <SheetDescription>
                 {selected
                   ? (selected.title ?? selected.sessionId ?? selected.spanId.slice(0, 8))
-                  : "Recent model calls, newest first."}
+                  : "This chat's model calls, newest first."}
               </SheetDescription>
             </div>
           </div>
@@ -109,13 +113,17 @@ export function ObservabilityDrawer({
         {error ? <p className="text-destructive px-4 py-2 text-xs">{error}</p> : null}
         {!selected ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {calls === null ? (
+            {!sessionId ? (
+              <p className="text-muted-foreground px-4 py-8 text-center text-xs">
+                No active chat. Select or start a conversation to see its model calls.
+              </p>
+            ) : calls === null ? (
               <p className="text-muted-foreground px-4 py-8 text-center text-xs">
                 Loading calls…
               </p>
             ) : calls.length === 0 ? (
               <p className="text-muted-foreground px-4 py-8 text-center text-xs">
-                No model calls recorded yet.
+                No model calls recorded for this chat yet.
               </p>
             ) : (
               <table className="w-full text-left text-xs">

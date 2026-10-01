@@ -53,8 +53,10 @@ export function fetchTraceSpans(traceId: string): Promise<{ spans: TraceSpan[] }
   return request(`/api/observability/traces/${encodeURIComponent(traceId)}`);
 }
 
-export function fetchModelCalls(limit = 50): Promise<{ calls: ModelCallSummary[] }> {
-  return request(`/api/observability/calls?limit=${limit}`);
+export function fetchModelCalls(limit = 50, sessionId?: string): Promise<{ calls: ModelCallSummary[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (sessionId) params.set("sessionId", sessionId);
+  return request(`/api/observability/calls?${params.toString()}`);
 }
 
 export function formatTokens(count: number): string {

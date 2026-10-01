@@ -8,9 +8,12 @@ export async function GET(request: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const params = new URL(request.url).searchParams;
   const limit = Math.min(
-    Math.max(Number(new URL(request.url).searchParams.get("limit") ?? 50), 1),
+    Math.max(Number(params.get("limit") ?? 50), 1),
     200,
   );
-  return NextResponse.json({ calls: await listModelCalls(limit) });
+  const requested = params.get("sessionId");
+  const sessionFilter = requested && /^[A-Za-z0-9_-]{1,128}$/.test(requested) ? requested : undefined;
+  return NextResponse.json({ calls: await listModelCalls(limit, sessionFilter) });
 }

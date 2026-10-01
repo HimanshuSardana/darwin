@@ -200,13 +200,16 @@ export async function getTrace(id: string): Promise<TraceSpan[] | null> {
 }
 
 /** Flattened model calls across recent traces, newest first. */
-export async function listModelCalls(limit: number): Promise<ModelCallSummary[]> {
-  if (callsCache && Date.now() - callsCache.at < CACHE_TTL_MS) {
+export async function listModelCalls(limit: number, sessionId?: string): Promise<ModelCallSummary[]> {
+  if (!sessionId && callsCache && Date.now() - callsCache.at < CACHE_TTL_MS) {
     return callsCache.calls.slice(0, limit);
   }
   const summaries = await listTraces();
+  const wanted = sessionId
+    ? summaries.filter((summary) => summary.sessionId === sessionId)
+    : summaries;
   const calls: ModelCallSummary[] = [];
-  for (const summary of summaries) {
+  for (const summary of wanted) {
     const spans = await readTraceSpans(summary.id);
     for (const span of spans) {
       if (!span.name.startsWith("chat ")) continue;
@@ -227,6 +230,6 @@ export async function listModelCalls(limit: number): Promise<ModelCallSummary[]>
     }
   }
   calls.sort((a, b) => b.startNs - a.startNs);
-  callsCache = { at: Date.now(), calls };
+  if (!sessionId) callsCache = { at: Date.now(), calls };
   return calls.slice(0, limit);
 }
