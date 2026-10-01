@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "motion/react";
 import {
   formatDurationNs,
   formatTokens,
@@ -88,6 +89,7 @@ export function MessageCard({ index, message }: { readonly index: number; readon
 }
 
 export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
+  const [tab, setTab] = useState("messages");
   const input = useMemo(
     () => parseJson(span.attrs["gen_ai.input.messages"]),
     [span.attrs],
@@ -118,31 +120,59 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
           finish: {span.attrs["ai.response.finish_reason"]?.toString() ?? "?"}
         </span>
       </div>
-      <Tabs defaultValue="messages">
-        <TabsList className="gap-1 bg-transparent p-0">
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="border-border h-8 gap-0.5 rounded-none border-b bg-transparent p-0">
           <TabsTrigger
-            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             value="messages"
           >
             Messages ({messages.length})
+            {tab === "messages" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
           </TabsTrigger>
           <TabsTrigger
-            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             value="system"
           >
             System
+            {tab === "system" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
           </TabsTrigger>
           <TabsTrigger
-            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             value="output"
           >
             Output
+            {tab === "output" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
           </TabsTrigger>
           <TabsTrigger
-            className="text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            className="relative h-8 rounded-none px-2.5 text-xs data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             value="raw"
           >
             Raw
+            {tab === "raw" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="messages">
