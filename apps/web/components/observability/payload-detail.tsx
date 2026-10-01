@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createHighlighter, type Highlighter } from "shiki";
 import { ChevronDownIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "motion/react";
 import {
   formatDurationNs,
   formatTokens,
@@ -11,18 +14,65 @@ import {
 } from "@/lib/observability";
 import { cn } from "@/lib/utils";
 
+let highlighterPromise: Promise<Highlighter> | null = null;
+
+function getHighlighter(): Promise<Highlighter> {
+  highlighterPromise ??= createHighlighter({ themes: ["github-dark"], langs: ["json"] });
+  return highlighterPromise;
+}
+
+/** JSON payloads get github-dark highlighting (same as chat code blocks). */
+function HighlightedJson({ code }: { readonly code: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (code.length > 100_000) return;
+    void getHighlighter()
+      .then((highlighter) => {
+        if (!cancelled) {
+          setHtml(highlighter.codeToHtml(code, { lang: "json", theme: "github-dark" }));
+        }
+      })
+      .catch(() => {
+        // Fall through to the plain rendering below.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+  if (!html) {
+    return <pre className="whitespace-pre-wrap font-mono text-xs break-words">{code}</pre>;
+  }
+  return (
+    <div
+      className="payload-code text-xs [&_pre]:bg-transparent! [&_pre]:p-0!"
+      // Shiki output is escaped HTML, never user markup.
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
 export function TextBlock({ text }: { readonly text: unknown }) {
   const body = typeof text === "string" ? text : JSON.stringify(text, null, 2) ?? "(empty)";
   const [expanded, setExpanded] = useState(false);
   const limit = 1200;
-  if (body.length <= limit) {
-    return <pre className="whitespace-pre-wrap font-mono text-xs break-words">{body}</pre>;
+  const shown = expanded ? body : body.slice(0, limit);
+  let isJson = false;
+  try {
+    const parsed = JSON.parse(body);
+    isJson = typeof parsed === "object" && parsed !== null;
+  } catch {
+    isJson = false;
   }
+  const content = isJson ? (
+    <HighlightedJson code={shown} />
+  ) : (
+    <pre className="whitespace-pre-wrap font-mono text-xs break-words">{shown}</pre>
+  );
+  if (body.length <= limit) return content;
   return (
     <div>
-      <pre className="whitespace-pre-wrap font-mono text-xs break-words">
-        {expanded ? body : `${body.slice(0, limit)}…`}
-      </pre>
+      {content}
       <button
         className="text-muted-foreground hover:text-foreground mt-1 text-xs underline"
         onClick={() => setExpanded((open) => !open)}
@@ -87,7 +137,7 @@ export function MessageCard({ index, message }: { readonly index: number; readon
 }
 
 export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
-  const [tab, setTab] = useState<"messages" | "system" | "output" | "raw">("messages");
+  const [tab, setTab] = useState("messages");
   const input = useMemo(
     () => parseJson(span.attrs["gen_ai.input.messages"]),
     [span.attrs],
@@ -118,54 +168,81 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
           finish: {span.attrs["ai.response.finish_reason"]?.toString() ?? "?"}
         </span>
       </div>
-      <div className="border-border flex gap-1 border-b pb-2">
-        {(["messages", "system", "output", "raw"] as const).map((entry) => (
-          <button
-            className={cn(
-              "rounded-md px-2.5 py-1 text-xs font-medium",
-              tab === entry ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+      <Tabs value={tab} onValueChange={setTab} className="payload-tabs">
+        <TabsList>
+          <TabsTrigger value="messages">
+            Messages ({messages.length})
+            {tab === "messages" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="system">
+            System
+            {tab === "system" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="output">
+            Output
+            {tab === "output" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="raw">
+            Raw
+            {tab === "raw" ? (
+              <motion.span
+                className="bg-foreground absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                layoutId="payload-tab-underline"
+                transition={{ type: "spring", stiffness: 500, damping: 40 }}
+              />
+            ) : null}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="messages">
+          <div className="flex flex-col gap-2">
+            {messages.length === 0 ? (
+              <p className="text-muted-foreground text-xs">No messages recorded.</p>
+            ) : (
+              messages.map((message, index) => (
+                <MessageCard index={index} key={index} message={message} />
+              ))
             )}
-            key={entry}
-            onClick={() => setTab(entry)}
-            type="button"
-          >
-            {entry === "messages"
-              ? `Messages (${messages.length})`
-              : entry[0].toUpperCase() + entry.slice(1)}
-          </button>
-        ))}
-      </div>
-      {tab === "messages" ? (
-        <div className="flex flex-col gap-2">
-          {messages.length === 0 ? (
-            <p className="text-muted-foreground text-xs">No messages recorded.</p>
+          </div>
+        </TabsContent>
+        <TabsContent value="system">
+          {typeof system === "string" ? (
+            <TextBlock text={JSON.stringify(parseJson(system), null, 2)} />
           ) : (
-            messages.map((message, index) => (
-              <MessageCard index={index} key={index} message={message} />
-            ))
+            <p className="text-muted-foreground text-xs">No system instructions recorded.</p>
           )}
-        </div>
-      ) : null}
-      {tab === "system" ? (
-        typeof system === "string" ? (
-          <TextBlock text={JSON.stringify(parseJson(system), null, 2)} />
-        ) : (
-          <p className="text-muted-foreground text-xs">No system instructions recorded.</p>
-        )
-      ) : null}
-      {tab === "output" ? (
-        <TextBlock
-          text={
-            typeof span.attrs["ai.response.text"] === "string" &&
-            !span.attrs["gen_ai.output.messages"]
-              ? span.attrs["ai.response.text"]
-              : JSON.stringify(output, null, 2)
-          }
-        />
-      ) : null}
-      {tab === "raw" ? (
-        <TextBlock text={JSON.stringify(span.attrs, null, 2)} />
-      ) : null}
+        </TabsContent>
+        <TabsContent value="output">
+          <TextBlock
+            text={
+              typeof span.attrs["ai.response.text"] === "string" &&
+              !span.attrs["gen_ai.output.messages"]
+                ? span.attrs["ai.response.text"]
+                : JSON.stringify(output, null, 2)
+            }
+          />
+        </TabsContent>
+        <TabsContent value="raw">
+          <TextBlock text={JSON.stringify(span.attrs, null, 2)} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

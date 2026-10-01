@@ -46,6 +46,32 @@
   overflow-x: auto;
 }
 
+/* Payload inspector tabs: quiet bottom-lined labels with a sliding
+   motion underline. Plain CSS (not utilities) so app chrome always wins
+   over the shadcn pill defaults regardless of cascade order. */
+.payload-tabs [data-slot="tabs-list"] {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  gap: 2px;
+  height: 2rem;
+  padding: 0;
+}
+.payload-tabs [data-slot="tabs-trigger"] {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 12px;
+  height: 2rem;
+  position: relative;
+}
+.payload-tabs [data-slot="tabs-trigger"][data-state="active"] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--foreground);
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
