@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   formatDurationNs,
   formatTokens,
@@ -87,7 +88,6 @@ export function MessageCard({ index, message }: { readonly index: number; readon
 }
 
 export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
-  const [tab, setTab] = useState<"messages" | "system" | "output" | "raw">("messages");
   const input = useMemo(
     () => parseJson(span.attrs["gen_ai.input.messages"]),
     [span.attrs],
@@ -118,54 +118,45 @@ export function ChatSpanDetail({ span }: { readonly span: TraceSpan }) {
           finish: {span.attrs["ai.response.finish_reason"]?.toString() ?? "?"}
         </span>
       </div>
-      <div className="border-border flex gap-1 border-b pb-2">
-        {(["messages", "system", "output", "raw"] as const).map((entry) => (
-          <button
-            className={cn(
-              "rounded-md px-2.5 py-1 text-xs font-medium",
-              tab === entry ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+      <Tabs defaultValue="messages">
+        <TabsList>
+          <TabsTrigger value="messages">Messages ({messages.length})</TabsTrigger>
+          <TabsTrigger value="system">System</TabsTrigger>
+          <TabsTrigger value="output">Output</TabsTrigger>
+          <TabsTrigger value="raw">Raw</TabsTrigger>
+        </TabsList>
+        <TabsContent value="messages">
+          <div className="flex flex-col gap-2">
+            {messages.length === 0 ? (
+              <p className="text-muted-foreground text-xs">No messages recorded.</p>
+            ) : (
+              messages.map((message, index) => (
+                <MessageCard index={index} key={index} message={message} />
+              ))
             )}
-            key={entry}
-            onClick={() => setTab(entry)}
-            type="button"
-          >
-            {entry === "messages"
-              ? `Messages (${messages.length})`
-              : entry[0].toUpperCase() + entry.slice(1)}
-          </button>
-        ))}
-      </div>
-      {tab === "messages" ? (
-        <div className="flex flex-col gap-2">
-          {messages.length === 0 ? (
-            <p className="text-muted-foreground text-xs">No messages recorded.</p>
+          </div>
+        </TabsContent>
+        <TabsContent value="system">
+          {typeof system === "string" ? (
+            <TextBlock text={JSON.stringify(parseJson(system), null, 2)} />
           ) : (
-            messages.map((message, index) => (
-              <MessageCard index={index} key={index} message={message} />
-            ))
+            <p className="text-muted-foreground text-xs">No system instructions recorded.</p>
           )}
-        </div>
-      ) : null}
-      {tab === "system" ? (
-        typeof system === "string" ? (
-          <TextBlock text={JSON.stringify(parseJson(system), null, 2)} />
-        ) : (
-          <p className="text-muted-foreground text-xs">No system instructions recorded.</p>
-        )
-      ) : null}
-      {tab === "output" ? (
-        <TextBlock
-          text={
-            typeof span.attrs["ai.response.text"] === "string" &&
-            !span.attrs["gen_ai.output.messages"]
-              ? span.attrs["ai.response.text"]
-              : JSON.stringify(output, null, 2)
-          }
-        />
-      ) : null}
-      {tab === "raw" ? (
-        <TextBlock text={JSON.stringify(span.attrs, null, 2)} />
-      ) : null}
+        </TabsContent>
+        <TabsContent value="output">
+          <TextBlock
+            text={
+              typeof span.attrs["ai.response.text"] === "string" &&
+              !span.attrs["gen_ai.output.messages"]
+                ? span.attrs["ai.response.text"]
+                : JSON.stringify(output, null, 2)
+            }
+          />
+        </TabsContent>
+        <TabsContent value="raw">
+          <TextBlock text={JSON.stringify(span.attrs, null, 2)} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
